@@ -580,3 +580,23 @@ explanation <- FF_test_tbl %>%
         kernel_width   = 1
     )
 plot_explanations(explanation)
+
+
+#Simulation ----
+p_load("truncnorm")
+library(truncnorm)
+sims <- 5
+starts <- 
+    rep(1, sims) %>% 
+    set_names(paste("asset_", 1:sims, sep = ""))
+starts
+
+simulation_func <- function(init_value, N){
+    tibble(c(init_value, rtruncnorm(n = N,
+                                    a = 0,
+                                    b = 1))) 
+}
+
+# tibble with 5 columns
+map_dfc(starts, simulation_func, N = 51) %>% 
+    set_names(glue("asset_{1:sims}"))
