@@ -589,7 +589,8 @@ library(truncnorm)
 sims <- 5
 starts <- 
     rep(1, sims) %>% 
-    set_names(paste("asset_", 1:sims, sep = ""))
+    # set_names(paste("asset_", 1:sims, sep = ""))
+    set_names(paste(symbols))
 starts
 
 simulation_func <- function(init_value, N){
@@ -600,7 +601,8 @@ simulation_func <- function(init_value, N){
 
 # tibble with 5 columns
 simulation_tbl <- map_dfc(starts, simulation_func, N = 51) %>% 
-    set_names(glue("asset_{1:sims}")) %>% 
+    # set_names(glue("asset_{1:sims}")) %>% 
+    set_names(glue("{symbols}")) %>% 
     
     #adding descriptive variable for janitor to work
     rownames_to_column() %>% 
@@ -610,33 +612,90 @@ simulation_tbl <- map_dfc(starts, simulation_func, N = 51) %>%
     
     #check to make sure it sums to 1
     # mutate(sum = rowSums(.[2:6])) %>% 
-    as_tibble()
+    as_tibble() %>% 
+    select(-rowname)
 
-simulation_tbl  
-
-1:10 %>%
-    map_dfc(~ rnorm(10, .x))
-
+simulation_vector <- as.vector(t(simulation_tbl)) #t(df) coerces to a numeric matrix, and as.vector removes the names
 
 symbols <- c("VTI", "TLT", "IEF", "GLD", "DBC")
 end     <- "2019-11-30" %>% ymd()
 start   <- end - years(5) + days(1)
-w <- c(0.3,
-       0.4,
-       0.15,
-       0.075,
-       0.075)
-wts_tbl <- tibble(symbols, w)
-
-wts_tbl_2 <- map_dfc(wts_tbl, ~rnorm(5, .x))
 
 source(file = "00_Scripts/portfolio_multi_period_data.R")
 source(file = "00_Scripts/import_FF.R")
 
 
-map_df()
-# All seasons data and portfolio
-portfolio_training_data <- portfolio_multi_period_data(symbols, end, start, wts_tbl, period = "monthly")
+weights_table <- tibble(symbols) %>% 
+    tq_repeat_df(n = 52) %>% 
+    bind_cols(tibble(simulation_vector)) %>% 
+    group_by(portfolio)
 
-devtools::install_github("seasmith/AlignAssign")
-cat("\014")
+stock_returns_monthly_multi <- single_portfolio(symbols = symbols, end = end, start = start) %>% 
+    tq_repeat_df(n = 52)
+
+simulation_portfolio_monthly <- stock_returns_monthly_multi %>% 
+    tq_portfolio(assets_col = symbol,
+                 returns_col = monthly.returns,
+                 weights = weights_table,
+                 wealth.index = TRUE) %>% 
+    mutate(investment.growth = portfolio.wealthindex * 10000)
+
+# Portfolio with highest/lowest return 
+max_sim_port_tbl <- simulation_portfolio_monthly %>%
+    ungroup() %>% 
+    slice(which.max(simulation_portfolio_monthly$investment.growth)) %>% 
+    pull(portfolio)
+
+min_sim_port_tbl <- simulation_portfolio_monthly %>% 
+    ungroup() %>% 
+    slice(which.min(simulation_portfolio_monthly$investment.growth)) %>% 
+    pull(portfolio)
+
+simulation_tbl %>% 
+    rownames_to_column() %>% 
+    filter(rowname %in% c(max_sim_port_tbl, min_sim_port_tbl))
+
+
+sim_summary <- simulation_portfolio_monthly %>% 
+    summarize(final = last(investment.growth)) %>% 
+    summarize(
+        max = max(final),
+        min = min(final),
+        median = median(final)
+    )
+
+sim_summary
+
+# Plotting
+simulation_portfolio_monthly %>% 
+    ungroup() %>% 
+    mutate(portfolio = as_factor(portfolio)) %>% 
+    ggplot(aes(x = date, y = investment.growth, colour = portfolio)) + 
+    geom_line(stat = "identity") + 
+    theme_tq() +
+    theme(legend.position = "none")
+
+# Min Max Plotting
+simulation_portfolio_monthly %>% 
+    filter(
+        last(investment.growth)     == sim_summary$max ||
+            last(investment.growth) == sim_summary$min
+        ) %>%
+    ungroup() %>% 
+    mutate(portfolio = as_factor(portfolio)) %>% 
+    ggplot(aes(x = date, y = investment.growth, colour = portfolio)) +
+    geom_line(stat = "identity")
+
+# Highcharter Plotting 
+hchart(simulation_portfolio_monthly, 
+       type = 'line',
+       hcaes(y = investment.growth,
+             x = date,
+             group = portfolio)) %>% 
+    hc_title(text = "Simulation of All Seasons Portfolio") %>% 
+    hc_xAxis(title = "") %>% 
+    hc_yAxis(title = list(text = "investment growth"),
+             labels = list(format = "${value}")) %>% 
+    hc_add_theme(hc_theme_flat()) %>% 
+    hc_exporting(enabled = TRUE) %>% 
+    hc_legend(enabled = FALSE)
