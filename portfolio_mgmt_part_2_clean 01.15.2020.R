@@ -583,7 +583,8 @@ plot_explanations(explanation)
 
 
 #Simulation ----
-p_load("truncnorm")
+p_load("truncnorm", 
+       "janitor")
 library(truncnorm)
 sims <- 5
 starts <- 
@@ -598,5 +599,44 @@ simulation_func <- function(init_value, N){
 }
 
 # tibble with 5 columns
-map_dfc(starts, simulation_func, N = 51) %>% 
-    set_names(glue("asset_{1:sims}"))
+simulation_tbl <- map_dfc(starts, simulation_func, N = 51) %>% 
+    set_names(glue("asset_{1:sims}")) %>% 
+    
+    #adding descriptive variable for janitor to work
+    rownames_to_column() %>% 
+    
+    #janitor package to convert value to percentages
+    adorn_percentages() %>% 
+    
+    #check to make sure it sums to 1
+    # mutate(sum = rowSums(.[2:6])) %>% 
+    as_tibble()
+
+simulation_tbl  
+
+1:10 %>%
+    map_dfc(~ rnorm(10, .x))
+
+
+symbols <- c("VTI", "TLT", "IEF", "GLD", "DBC")
+end     <- "2019-11-30" %>% ymd()
+start   <- end - years(5) + days(1)
+w <- c(0.3,
+       0.4,
+       0.15,
+       0.075,
+       0.075)
+wts_tbl <- tibble(symbols, w)
+
+wts_tbl_2 <- map_dfc(wts_tbl, ~rnorm(5, .x))
+
+source(file = "00_Scripts/portfolio_multi_period_data.R")
+source(file = "00_Scripts/import_FF.R")
+
+
+map_df()
+# All seasons data and portfolio
+portfolio_training_data <- portfolio_multi_period_data(symbols, end, start, wts_tbl, period = "monthly")
+
+devtools::install_github("seasmith/AlignAssign")
+cat("\014")
