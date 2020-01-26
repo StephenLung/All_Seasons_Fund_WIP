@@ -17,24 +17,49 @@ pacman::p_load("tidyquant",
 # 1.0 IMPORT DATA ----
 
 symbols <- c("VTI", "TLT", "IEF", "GLD", "DBC")
-end     <- "2019-11-30" %>% ymd()
-start   <- end - years(5) + days(1)
-w <- c(0.3,
+end     <- "2019-12-31" %>% ymd()
+start   <- end - years(10) + days(1)
+w       <- c(0.3,
        0.4,
        0.15,
        0.075,
        0.075)
 wts_tbl <- tibble(symbols, w)
+N       <- 100
 source(file = "00_Scripts/portfolio_multi_period_data.R")
 source(file = "00_Scripts/import_FF.R")
 source(file = "00_Scripts/simulate_monthly_portfolio.R")
 
-simulation_tbl <- simulation_tbl(sims = 5, symbols = symbols, end = end, start = start, N = 51)
+benchmark_tbl <- multi_asset_portfolio(symbols = symbols, end = end, start = start, wts_tbl = wts_tbl) %>% 
+  tq_portfolio(assets_col = symbol,
+               returns_col = monthly.returns,
+               weights = wts_tbl,
+               wealth.index = TRUE) %>% 
+  mutate(investment.growth = portfolio.wealthindex * 10000) %>% 
+  add_column(portfolio = "Benchmark", .before = 1)
+
+simulation_tbl <- simulation_tbl(sims = 5, symbols = symbols, end = end, start = start, N = N)
 simulation_tbl
-simulation_portfolio_monthly <- simulate_monthly_portfolio(sims = 5, symbols = symbols, end = end, start = start, N = 51)
-simulation_portfolio_monthly
+simulation_portfolio_monthly <- simulate_monthly_portfolio(sims = 5, symbols = symbols, end = end, start = start, N = N)
+simulation_portfolio_monthly %>% 
+  slice(60)
+
+simulation_portfolio_monthly_xts <- simulation_portfolio_monthly %>% 
+  ungroup() %>% 
+  mutate(portfolio = as.character(portfolio)) %>% 
+  rbind(benchmark_tbl) %>% 
+  pivot_wider(names_from = "portfolio", values_from = "investment.growth", -portfolio.wealthindex) %>% 
+  # convert to xts functions
+  timetk::tk_xts(date_var = date)
 
 # Portfolio with highest/lowest return 
+benchmark_return_tbl <- wts_tbl %>% 
+  pivot_wider(names_from = "symbols", values_from = "w") %>% 
+  add_column(Portfolio = "Benchmark") %>% 
+  select(Portfolio, everything())
+benchmark_return_tbl
+
+
 max_sim_port_tbl <- simulation_portfolio_monthly %>%
   ungroup() %>% 
   slice(which.max(simulation_portfolio_monthly$investment.growth)) %>% 
@@ -47,7 +72,9 @@ min_sim_port_tbl <- simulation_portfolio_monthly %>%
 
 simulation_tbl %>% 
   rownames_to_column() %>% 
-  filter(rowname %in% c(max_sim_port_tbl, min_sim_port_tbl))
+  filter(rowname %in% c(max_sim_port_tbl, min_sim_port_tbl)) %>% 
+  rename(Portfolio = rowname) %>% 
+  rbind(benchmark_return_tbl)
 
 
 sim_summary <- simulation_portfolio_monthly %>% 
@@ -80,16 +107,41 @@ simulation_portfolio_monthly %>%
   ggplot(aes(x = date, y = investment.growth, colour = portfolio)) +
   geom_line(stat = "identity")
 
+simulation_portfolio_monthly %>% 
+  slice(120)
+
 # Highcharter Plotting 
 hchart(simulation_portfolio_monthly, 
-       type = 'line',
+       type = "line",
        hcaes(y = investment.growth,
              x = date,
              group = portfolio)) %>% 
-  hc_title(text = "Simulation of All Seasons Portfolio") %>% 
+  hc_title(text = glue("Simulation of {N} Portfolio")) %>% 
   hc_xAxis(title = "") %>% 
-  hc_yAxis(title = list(text = "investment growth"),
+  hc_yAxis(title = list(text = "Investment Growth"),
            labels = list(format = "${value}")) %>% 
-  hc_add_theme(hc_theme_flat()) %>% 
+  hc_tooltip(pointFormat =
+               "<span style=\"color:{series.color}\">{series.name}</span>:<b>${point.y:,.0f}</b><br/>",
+             shared=TRUE) %>% 
+  # hc_add_theme(hc_theme_flat()) %>% 
   hc_exporting(enabled = TRUE) %>% 
-  hc_legend(enabled = FALSE)
+  hc_legend(enabled = FALSE) %>% 
+  hc_add_theme(hc_theme_smpl())
+
+highchart(type = "stock") %>%
+  hc_add_series(simulation_portfolio_monthly_xts[,max_sim_port_tbl],
+                name = "Maximum Return") %>% 
+  hc_add_series(simulation_portfolio_monthly_xts[,min_sim_port_tbl],
+                name = "Minimum Return") %>% 
+  hc_add_series(simulation_portfolio_monthly_xts[,"Benchmark"],
+                name = "Benchmark Return") %>% 
+  hc_tooltip(pointFormat =
+               "<span style=\"color:{series.color}\">{series.name}</span>:<b>${point.y:,.0f}</b><br/>",
+             shared=TRUE) %>%
+  hc_title(text = "Best & Worst Return Simulation vs Benchmark Return") %>% 
+  hc_yAxis(title = list(text = "Investment Growth"),
+           labels = list(format = "${value}")) %>% 
+  hc_exporting(enabled = TRUE) %>% 
+  hc_add_theme(hc_theme_chalk())
+
+  
