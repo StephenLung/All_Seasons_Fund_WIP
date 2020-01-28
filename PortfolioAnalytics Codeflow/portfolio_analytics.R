@@ -24,6 +24,7 @@ source(file = "00_Scripts/simulate_monthly_portfolio.R")
 
 # 1. Data
 
+# Pull financial data and convert into xts format
 returns_xts <- multi_asset_portfolio(symbols = symbols, end = end, start = start) %>% 
   pivot_wider(names_from = "symbol", values_from = "monthly.returns") %>% 
   tk_xts(date_var = date)
@@ -33,6 +34,7 @@ fund.names
 
 # 2. Portfolio Object
 
+# Name the portfolio object
 pspec <- portfolio.spec(assets = fund.names)
 print.default(pspec)
 
@@ -42,25 +44,32 @@ print.default(pspec)
 pspec <- add.constraint(portfolio = pspec,
                         type = "full_investment")
 pspec <- add.constraint(portfolio = pspec,
-                        type = "box",
-                        min = 0,
-                        max = 1)
+                        type = "long_only") #same as type = "long_only"
+# type = "box",
+# min = 0,
+# max = 1
 
 pspec
-print(pspec)
-summary(pspec)
+print(pspec) #concise summary
+summary(pspec) #detailed summary
 
 # 4. Adding Objectives
 
-maxret <- add.objective(portfolio = pspec,
+# Objective to maximize return
+pspec <- add.objective(portfolio = pspec,
                        type = 'return',
                        name = 'mean')
 
+# Objective to minimize risk
+pspec <- add.objective(portfolio = pspec,
+                        type = "risk",
+                        name = "StdDev")
+
 # [next update: minimize portfolio tail loss with CI 95%] ------
-maxret <- add.objective(portfolio = pspec,
-                       type = 'risk',
-                       name = 'ETL',
-                       arguments = list(p=0.95))
+# maxret <- add.objective(portfolio = pspec,
+#                        type = 'risk',
+#                        name = 'ETL',
+#                        arguments = list(p=0.95))
 
 minvar <- add.objective(portfolio = pspec,
                        type = 'risk',
@@ -69,18 +78,28 @@ minvar <- add.objective(portfolio = pspec,
 print(pspec)
 
 # 5. Optimize ROI
-
-opt_maxret <- optimize.portfolio(R = returns_xts, portfolio = maxret,
+# Optimize using ROI package for best return and risk
+opt_maxret <- optimize.portfolio(R = returns_xts, portfolio = pspec,
                                  optimize_method = "ROI",
                                  trace = TRUE)
-print(opt_maxret)
 
 opt_minvar <- optimize.portfolio(R = returns_xts, portfolio = minvar,
-                                 optimize_method = "ROI",
+                                 optimize_method = "ROI", 
                                  trace = TRUE)
+
+# Optimize using ROI package for best sharpe ratio (maximize mean return per unit of stdDev)
+maxSR_opt_maxret <- optimize.portfolio(R = returns_xts, portfolio = pspec,
+                                       optimize_method = "ROI",
+                                       maxSR = TRUE, trace = TRUE)
 
 # 6. Plotting risk-return
 
+# Plotting the optimize Sharpe Ratio function
+plot(maxSR_opt_maxret, risk.col = "StdDev", return.col = "mean",
+     main = "Sharpe Ratio Optimization", chart.assets = TRUE)
+chart.RiskReward(maxSR_opt_maxret, risk.col = "StdDev", return.col = "mean")
+
+# Plotting the maximize return function
 plot(opt_maxret, risk.col = "StdDev", return.col = "mean",
      main = "Maximum Return Optimization", chart.assets = TRUE)
 
@@ -101,4 +120,9 @@ plot()
 
 chart.RiskReward()
 
+# 7. Extract the weights from the optimize function
+
+print(maxSR_opt_maxret)
+extractWeights(maxSR_opt_maxret)
+print(opt_maxret)
 extractWeights(opt_maxret)
