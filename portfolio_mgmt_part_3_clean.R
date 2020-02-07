@@ -144,4 +144,76 @@ highchart(type = "stock") %>%
   hc_exporting(enabled = TRUE) %>% 
   hc_add_theme(hc_theme_chalk())
 
-  
+# Clean Wealth Index Plot ----
+symbols <- c("VTI", "TLT", "IEF", "GLD", "DBC")
+end <- "2019-06-30" %>% ymd()
+start <- end - years(30) + days(1)
+w       <- c(0.3,
+             0.4,
+             0.15,
+             0.075,
+             0.075)
+wts_tbl <- tibble(symbols, w)
+w_2 <- c(0.3, 0.4, 0.15, 0.075, 0.075,
+         1, 0, 0, 0, 0,
+         0, 1, 0, 0, 0,
+         0, 0, 1, 0, 0,
+         0, 0, 0, 1, 0,
+         0, 0, 0, 0, 1)
+
+# Duplicating symbols over 6 rows
+weights_tbl <- tibble(symbols) %>%
+  tq_repeat_df(n = 6) %>% 
+  bind_cols(tibble(w_2)) %>% 
+  group_by(portfolio) 
+
+# Transmute to monthly returns, filter date, and repeat 6 rows
+raw_data <- symbols %>% 
+  tq_get(get = "stock.prices",
+         from = "2006-02-01",
+         to = end) %>% 
+  group_by(symbol) %>% 
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = "monthly") %>% 
+  ungroup() %>% 
+  #rollback to first day of the month - ETF Issue ----
+  mutate(date = lubridate::rollback(date, roll_to_first = TRUE)) %>% 
+  tq_repeat_df(n = 6) %>% 
+
+# Investment growth
+  tq_portfolio(assets_col = symbol,
+               returns_col = monthly.returns,
+               weights = weights_tbl,
+               wealth.index = TRUE) %>% 
+  mutate(investment.growth = portfolio.wealthindex * 10000) %>% 
+
+# Adjusting portfolio # to names
+  ungroup() %>% 
+  mutate(portfolio = case_when(portfolio == 1 ~ "All Seasons Portfolio",
+                             portfolio == 2 ~ "VTI",
+                             portfolio == 3 ~ "TLT",
+                             portfolio == 4 ~ "IEF",
+                             portfolio == 5 ~ "GLD",
+                             portfolio == 6 ~ "DBC")) %>% 
+  mutate(portfolio = as.factor(portfolio))
+
+end_port_returns_investment_tbl <- last(port_returns_investment_tbl$date)
+
+raw_data %>%
+  ggplot(aes(x = date, y = investment.growth, colour = portfolio)) + 
+  geom_line(stat = "identity") + 
+  geom_smooth(method = "loess") + 
+  theme_tq() + 
+  scale_color_tq() + 
+  scale_y_continuous(labels = scales::dollar) + 
+  labs(title = "All Seasons Fund Portfolio Growth vs Standalone Security Growth",
+       subtitle = "40% TLT, 30% VTI, 15% IEF, 7.5% GLD and 7.5% DBC",
+       caption = "Ray Dalio's All Weather Funds",
+       x = "",
+       y = "Investment Growth") +
+  annotate(geom = "text",
+           x = end_port_returns_investment_tbl,
+           y = 24000,
+           label = "Portfolio",
+           fontface = "plain")
