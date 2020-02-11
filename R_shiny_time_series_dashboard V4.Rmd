@@ -1,0 +1,301 @@
+---
+title: "All Weather Fund Flex Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+setwd("C:/Users/steph/Dropbox/Business University Science/102 Course/DS4B_102_R_Shiny_Apps_1/Personal Portfolio")
+
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load("DT",
+               "flexdashboard",
+               "shiny",
+               "tidyverse",
+               "tidyquant",
+               "shiny",
+               "shinyWidgets",
+               "plotly",
+               "shinyjs")
+
+```
+
+
+```{r}
+# 1.0 IMPORT DATA ----
+
+symbols <- c("VTI", "TLT", "IEF", "GLD", "DBC")
+end     <- "2019-11-30" %>% ymd()
+start   <- end - years(5) + days(1)
+w <- c(0.3,
+       0.4,
+       0.15,
+       0.075,
+       0.075)
+wts_tbl <- tibble(symbols, w)
+N       <- 100
+source(file = "00_Scripts/portfolio_multi_period_data.R")
+source(file = "00_Scripts/import_FF.R")
+source(file = "00_Scripts/simulate_monthly_portfolio.R")
+
+
+```
+
+Sidebar {.sidebar}
+----------------------------
+
+```{r}
+# Shinyjs enabled with rmarkdown
+useShinyjs(rmd = TRUE)
+
+# Inputs
+# Checkbox list for tickers
+shinyWidgets::checkboxGroupButtons(inputId = "asset_name_2",
+                                   label = "Select the tickers",
+                   choices = c("Stocks" = "VTI",
+                                "Long Term Bonds" = "TLT",
+                                "Medium Term Bonds" = "IEF",
+                                "Gold" = "GLD",
+                                "Commodities" = "DBC"),
+                   selected = c("VTI", "TLT", "IEF", "GLD", "DBC"),
+                   checkIcon = list(
+                       yes = icon("ok", lib = "glyphicon"),
+                       no = icon("remove", lib = "glyphicon")
+                   ))
+
+# Toggle between daily and monthly returns
+radioButtons(inputId = "return_timing", 
+                   label = "Select the format",
+                   choices = c("monthly",
+                               "daily"),
+                   selected = c("monthly"))
+
+# Toggle between dates 
+today_date <- today() %>% ymd() 
+dateRangeInput(inputId = "date_range",
+               label = "Select date range",
+               start = today_date - years(15) + days(1),
+               end = today_date,
+               min = today_date - years(15) + days(1),
+               max = today_date
+            )
+
+
+br()
+hr()
+br()
+
+# Apply button
+actionButton(inputId = "apply",
+             label = "Apply",
+             icon = icon("piggy-bank"))
+
+# Reset button
+actionButton(inputId = "reset",
+             label = "Reset",
+             icon = icon("sync"))
+
+observeEvent(eventExpr = input$reset,
+             handlerExpr = {
+                 
+                 updateCheckboxGroupButtons(session = session,
+                                          inputId = "asset_name_2",
+                                          selected = c("VTI", "TLT", "IEF", "GLD", "DBC"))
+             
+             # enables Shiny widgets to work together
+             shinyjs::delay(ms = 300, expr = {
+                 shinyjs::click(id = "apply")
+             })
+             })
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+# Delayed processing to pull tq_data
+end     <- "2019-11-30" %>% ymd()
+start   <- end - years(5) + days(1)
+w       <- c(0.3,
+             0.4,
+             0.15,
+             0.075,
+             0.075)
+wts_tbl <- tibble(symbols, w)
+w_2 <- c(0.3, 0.4, 0.15, 0.075, 0.075,
+         1, 0, 0, 0, 0,
+         0, 1, 0, 0, 0,
+         0, 0, 1, 0, 0,
+         0, 0, 0, 1, 0,
+         0, 0, 0, 0, 1)
+
+# Duplicating symbols over 6 rows
+weights_tbl <- tibble(symbols) %>%
+  tq_repeat_df(n = 6) %>% 
+  bind_cols(tibble(w_2)) %>% 
+  group_by(portfolio) 
+
+processed_tqdata_tbl <- eventReactive(eventExpr = input$apply,
+              valueExpr = {
+                input$asset_name_2 %>%   
+                tq_get(
+                       get = "stock.prices",
+                       from = input$date_range[1],
+                       to = input$date_range[2]) %>% 
+                  group_by(symbol) %>% 
+                  tq_transmute(select = adjusted,
+                               mutate_fun = periodReturn,
+                               period = input$return_timing) %>% 
+                  ungroup() %>% 
+                  #rollback to first day of the month - ETF Issue ----
+                  mutate(date = lubridate::rollback(date, roll_to_first = TRUE)) %>% 
+                  tq_repeat_df(n = 6) %>% 
+                  # Investment growth
+                  tq_portfolio(assets_col = symbol,
+                               returns_col = monthly.returns,
+                               weights = weights_tbl,
+                               wealth.index = TRUE) %>% 
+                  mutate(investment.growth = portfolio.wealthindex * 10000)
+              },
+              ignoreNULL = FALSE)
+
+# Adjusted table with better format
+tq_plot_tbl <- reactive({
+    
+    processed_tqdata_tbl() %>% 
+                # Adjusting portfolio # to names
+                  ungroup() %>% 
+                  mutate(portfolio = case_when(portfolio == 1 ~ "All Seasons Portfolio",
+                                             portfolio == 2 ~ "VTI",
+                                             portfolio == 3 ~ "TLT",
+                                             portfolio == 4 ~ "IEF",
+                                             portfolio == 5 ~ "GLD",
+                                             portfolio == 6 ~ "DBC")) %>% 
+                  mutate(portfolio = as.factor(portfolio))
+        
+    
+})
+
+# Tq_data by stock
+processed_data_filtered_tbl <- eventReactive(eventExpr = input$apply,
+              valueExpr = {
+                  
+                individual_asset_multi_period_data(input$asset_name_2, 
+                                                   end = input$date_range[2], 
+                                                   start = input$date_range[1], 
+                                                   period = input$return_timing) 
+              },
+              ignoreNULL = FALSE
+              )
+
+# Summary table for Valuebox
+summary_values_tbl <- eventReactive(eventExpr = input$apply,
+    valueExpr = {
+    tq_plot_tbl() %>% 
+        
+        summarize(
+            symbol = unique(portfolio) %>% length() - 1
+        )
+    
+},
+ignoreNULL = FALSE
+)
+
+
+```
+
+Row {data-height = 100}
+--------------------------
+
+### Tickers Selected
+```{r}
+
+renderValueBox({
+    
+    valueBox(value = summary_values_tbl()$symbol,
+        caption = "# of Tickers Selected",
+        icon = "fa-comment-dollar",
+        color = "success")
+})
+
+```
+
+<!-- ### Portfolio Return (%) -->
+<!-- ```{r} -->
+
+<!-- renderValueBox({ -->
+
+<!--     valueBox(value = summary_values_tbl()$symbol, -->
+<!--         caption = "# of Tickers Selected", -->
+<!--         icon = "fa-balance-scale-left", -->
+<!--         color = "success") -->
+<!-- }) -->
+
+<!-- ``` -->
+
+
+<!-- ### Sharpe Ratio -->
+<!-- ```{r} -->
+
+<!-- renderValueBox({ -->
+
+<!--     valueBox(value = summary_values_tbl()$symbol, -->
+<!--         caption = "# of Tickers Selected", -->
+<!--         icon = "fa-balance-scale-right", -->
+<!--         color = "success") -->
+<!-- }) -->
+
+<!-- ``` -->
+
+Row {data-height = 300}
+---------------------------
+
+### Section - Tq_get Data
+
+```{r}
+renderDataTable(processed_tqdata_tbl())
+```
+
+
+
+Row {data-height = 300}
+---------------------------
+
+
+### Section - Reactive Plot
+```{r}
+
+renderPlotly(expr = {
+    
+  tq_plot_tbl() %>% 
+  ggplot(aes(x = date, y = investment.growth, colour = portfolio)) + 
+  geom_line(stat = "identity") + 
+  geom_smooth(method = "loess") + 
+  theme_tq() + 
+  scale_color_tq() + 
+  scale_y_continuous(labels = scales::dollar) + 
+  labs(title = "All Seasons Fund Portfolio Growth vs Standalone Security Growth",
+       subtitle = "40% TLT, 30% VTI, 15% IEF, 7.5% GLD and 7.5% DBC",
+       caption = "Ray Dalio's All Weather Funds",
+       x = "",
+       y = "Investment Growth") +
+  annotate(geom = "text",
+           x = input$date_range[2],
+           y = 24000,
+           label = "Portfolio",
+           fontface = "plain")
+        
+    
+})
+
+
+
+```
+
