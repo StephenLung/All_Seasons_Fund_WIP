@@ -1,0 +1,70 @@
+---
+title: "All Seasons Prediction App"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(pacman)
+
+pacman::p_load(
+  # App
+  "flexdashboard",
+  
+  # Core0
+  "tidyquant",
+  "tidyr",
+  "tibble",
+  "dplyr",
+  "furrr", 
+  "purrr",
+  "dplyr",
+  "glue",
+  
+  # Visualizations
+  "plotly",
+  "highcharter",
+  "correlationfunnel",
+  
+  # Modeling
+  "parsnip"
+)
+
+# Scripts
+source("../01_Scripts_Flex/wealth_index.R")
+
+```
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+Space for Inputs
+
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A
+
+```{r}
+
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r}
+
+```
+
+### Chart C
+
+```{r}
+
+```
+

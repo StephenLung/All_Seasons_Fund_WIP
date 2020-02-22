@@ -12,8 +12,26 @@ w       <- c(0.3,
              0.075)
 wts_tbl <- tibble(symbols, w)
 
+
 # Pulls a full list of daily stock prices ----
 multi_asset_price_portfolio <- function(symbols, end, start, wts_tbl){
+  
+  if(length(symbols) == 1){
+    # Download Data
+    download_data <- symbols %>% 
+      tq_get(get = "stock.prices",
+             from = start,
+             to = end) 
+    
+    stock_data <- download_data %>%
+      select(date, adjusted) %>% 
+      add_column(symbol = symbols,
+                 .before = TRUE)
+    
+    return(stock_data)
+  }
+  
+  else if(length(symbols) > 1){
   
   # Download Data
   download_data <- symbols %>% 
@@ -36,9 +54,10 @@ multi_asset_price_portfolio <- function(symbols, end, start, wts_tbl){
   
   return(stock_data)
 
-  
+  }
 }
 
+multi_asset_price_portfolio("^GSPC", end, start, wts_tbl)
 stock_price_tbl <- multi_asset_price_portfolio(symbols, end, start, wts_tbl)
 
 # Transmutes daily stock prices to returns by specified period ----
@@ -66,13 +85,36 @@ wealth_index <- function(return_data, wts_tbl, name_portfolio){
   
   name_portfolio <- as_name(name_portfolio)
   
-  return_data %>% 
-  tq_portfolio(assets_col = symbol,
-               returns_col = returns,
-               weights = wts_tbl,
-               wealth.index = TRUE) %>% 
-    mutate(investment.growth = portfolio.wealthindex * 10000) %>% 
-    add_column(portfolio = name_portfolio, .before = 1)
+  # Determine # of tickers
+  symbol_length <- return_data %>% 
+    select(symbol) %>% 
+    unique() %>% 
+    pull(symbol)
+  
+  # One ticker will not require table weights for wealth index
+  if(length(symbol_length) == 1){
+    
+    return_data %>% 
+      tq_portfolio(assets_col = symbol,
+                   returns_col = returns,
+                   wealth.index = TRUE) %>% 
+      mutate(investment.growth = portfolio.wealthindex * 10000) %>% 
+      add_column(portfolio = name_portfolio, .before = 1)
+    
+  }
+  
+  # 1+ ticker will require table weights for wealth index
+  else if(length(symbol_length) > 1){
+    
+    return_data %>% 
+      tq_portfolio(assets_col = symbol,
+                   returns_col = returns,
+                   weights = wts_tbl,
+                   wealth.index = TRUE) %>% 
+      mutate(investment.growth = portfolio.wealthindex * 10000) %>% 
+      add_column(portfolio = name_portfolio, .before = 1)
+  }
+
 }
 
 # Plot the portfolio ----
@@ -89,4 +131,10 @@ min_date <- all_seasons_data %>%
             max_date = max(date)) %>% 
   pull(min_date)
 
-
+# S&P500 portfolio ----
+sp500_data <- multi_asset_price_portfolio(symbols = "^GSPC", 
+                                          end, 
+                                          start = min_date, 
+                                          wts_tbl) %>% 
+  multi_asset_return_portfolio(period = "monthly") %>% 
+  wealth_index(wts_tbl = wts_tbl, name_portfolio = "sp500")
