@@ -1,5 +1,6 @@
 ---
 title: "All Seasons Prediction App"
+runtime: shiny
 output: 
   flexdashboard::flex_dashboard:
     orientation: columns
@@ -14,8 +15,10 @@ pacman::p_load(
   # App
   "flexdashboard",
   
-  # Core0
+  # Core
   "tidyquant",
+  "tidyverse",
+  "timetk",
   "tidyr",
   "tibble",
   "dplyr",
@@ -23,6 +26,8 @@ pacman::p_load(
   "purrr",
   "dplyr",
   "glue",
+  "forcats",
+  "stringr",
   
   # Visualizations
   "plotly",
@@ -41,30 +46,223 @@ source("../01_Scripts_Flex/wealth_index.R")
 Column {.sidebar}
 -----------------------------------------------------------------------
 
-Space for Inputs
+Please enter the stocks and weights you would like to evaluate
+
+```{r}
+# First Portfolio Input
+fluidRow( #creates the input row
+  column(6, #creates a column with length 6
+         textInput("stock1", "Stock 1", "VTI")), #creates the text input field
+  column(5,
+         numericInput("w1", "Portf. %", 30,
+                      min = 1, max = 100))
+)
+
+# Second Portfolio Input
+fluidRow(
+  column(6,
+         textInput("stock2", "Stock 2", "TLT")),
+  column(5,
+         numericInput("w2", "Portf. %", 40,
+                      min = 1, max = 100))
+)
+
+# Third Portfolio Input
+fluidRow(
+  column(6,
+         textInput("stock3", "Stock 3", "IEF")),
+  column(5,
+         numericInput("w3", "Portf. %", 15,
+                      min = 1, max = 100))
+)
+
+# Fourth Portfolio Input
+fluidRow(
+  column(6,
+         textInput("stock4", "Stock 4", "GLD")),
+  column(5,
+         numericInput("w4", "Portf. %", 7.5,
+                      min = 1, max = 100))
+)
+
+# Fifth Portfolio Input
+fluidRow(
+  column(6,
+         textInput("stock5", "Stock 5", "DBC")),
+  column(5,
+         numericInput("w5", "Portf. %", 7.5,
+                      min = 1, max = 100))
+)
+
+# Portfolio Rebalance Interval
+fluidRow(
+  column(6,
+         selectInput("rebalance", "Rebalance Frequency",
+                     c("Yearly" = "years",
+                       "Monthly" = "months",
+                       "Weekly" = "weeks")))
+)
+
+
+# Benchmark Portfolio Input
+fluidRow(
+  column(10,
+         textInput("bench_stock", "Benchmark Stock", "^GSPC"))
+)
+
+# User input Start Date
+fluidRow(
+  column(7,
+         dateInput("start_date",
+                   "Starting Date",
+                   "2006-02-01",
+                   format = "yyyy-mm-dd"))
+)
+
+# User Input End Date
+fluidRow(
+  column(7,
+         dateInput("end_date",
+                   "End Date",
+                   today(),
+                   format = "yyyy-mm-dd"))
+)
+
+actionButton("go", "Submit") # Enables use of eventReactive() functions
+
+```
 
 
 Column {data-width=650}
 -----------------------------------------------------------------------
 
-### Chart A
+### Portfolio with User Input
 
 ```{r}
 
+portfolio_returns <- eventReactive(input$go, {
+  
+  symbols <- c(input$stock1, 
+               input$stock2,
+               input$stock3,
+               input$stock4,
+               input$stock5)
+  
+  end <- input$end_date
+  start <- input$start_date
+  
+  w <- c(input$w1/100,
+         input$w2/100,
+         input$w3/100,
+         input$w4/100,
+         input$w5/100)
+  
+  wts_tbl <- tibble(symbols, w)
+  
+# All seasons portfolio ----
+all_seasons_data <- multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>% 
+  multi_asset_return_portfolio(period = "monthly") %>% 
+  wealth_index(wts_tbl = wts_tbl, name_portfolio = "all seasons")
+
+# Start Date of all seasons portfolio
+min_date <- all_seasons_data %>%   
+  summarise(min_date = min(date), 
+            max_date = max(date)) %>% 
+  pull(min_date)
+
+# S&P500 portfolio ----
+sp500_data <- multi_asset_price_portfolio(symbols = input$bench_stock, 
+                                          end, 
+                                          start = min_date, 
+                                          wts_tbl) %>% 
+  multi_asset_return_portfolio(period = "monthly") %>% 
+  wealth_index(wts_tbl = wts_tbl, name_portfolio = "SP500")
+
+# Combine data
+bind_portfolio(all_seasons_data, sp500_data) 
+})
+
+# renderDataTable(expr = portfolio_returns())
+portfolio_returns 
 ```
+
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Portfolio vs Benchmark
+
+```{r}
+renderPlotly({
+  (portfolio_returns() %>% 
+    mutate(portfolio = as.factor(portfolio) %>% fct_reorder(investment.growth),
+           label_text = str_glue("Portfolio: {str_to_title(portfolio)}
+                                 Investment: {scales::dollar(investment.growth, accuracy = 1)}
+                                 Growth %: {scales::percent(portfolio.wealthindex - 1, accuracy = 0.01)}")) %>% 
+    ggplot(aes(x = date, y = investment.growth, col = portfolio)) +
+    geom_point(aes(text = label_text), size = 0.1) + #Must indicate label_text for tooltip to showup 
+    geom_line() + 
+    
+    # Addition of Global Financial Crisis vertical line in Sept 2008
+    geom_vline(xintercept = as.numeric(as.Date("2008-09-01")), linetype = "dotted", color = "red", size = 1.5) +
+    annotate("text", x =  as.Date("2008-09-01") + 1200, y = 23000, label = "2008 Financial Crisis", color = "red") + 
+
+    scale_color_tq() + 
+    scale_y_continuous(labels = scales::dollar_format()) + 
+    labs(title = "Portfolio vs Benchmark (SP500)",
+         x = "",
+         y = "")) %>%  
+  
+    ggplotly(tooltip = "text") #workaround issue on ggplotly; add parenthsis in front of ggplot
+})
+```
+
+
+<!-- # ```{r} -->
+<!-- #  -->
+<!-- #  -->
+<!-- # # All seasons portfolio ---- -->
+<!-- # all_seasons_data <- multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>%  -->
+<!-- #   multi_asset_return_portfolio(period = "monthly") %>%  -->
+<!-- #   wealth_index(wts_tbl = wts_tbl, name_portfolio = "all seasons") -->
+<!-- #  -->
+<!-- # # Start Date of all seasons portfolio -->
+<!-- # min_date <- all_seasons_data %>%    -->
+<!-- #   summarise(min_date = min(date),  -->
+<!-- #             max_date = max(date)) %>%  -->
+<!-- #   pull(min_date) -->
+<!-- #  -->
+<!-- # # S&P500 portfolio ---- -->
+<!-- # sp500_data <- multi_asset_price_portfolio(symbols = "^GSPC",  -->
+<!-- #                                           end,  -->
+<!-- #                                           start = min_date,  -->
+<!-- #                                           wts_tbl) %>%  -->
+<!-- #   multi_asset_return_portfolio(period = "monthly") %>%  -->
+<!-- #   wealth_index(wts_tbl = wts_tbl, name_portfolio = "SP500") -->
+<!-- #  -->
+<!-- # # Combine data -->
+<!-- # bind_portfolio(all_seasons_data, sp500_data) %>%  -->
+<!-- #   plot_portfolio(interactive = TRUE) -->
+<!-- #  -->
+<!-- # ``` -->
 
 Column {data-width=350}
 -----------------------------------------------------------------------
 
-### Chart B
+### Tickers Used in First Portfolio
 
 ```{r}
+
+format_table(symbols, w)
 
 ```
 
-### Chart C
+### Tickers and Weighting Used in Second Portfolio
 
 ```{r}
+
+format_table("^GSPC", 1)
+
 
 ```
 

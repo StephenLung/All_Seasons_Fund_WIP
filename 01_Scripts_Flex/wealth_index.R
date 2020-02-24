@@ -57,9 +57,6 @@ multi_asset_price_portfolio <- function(symbols, end, start, wts_tbl){
   }
 }
 
-multi_asset_price_portfolio("^GSPC", end, start, wts_tbl)
-stock_price_tbl <- multi_asset_price_portfolio(symbols, end, start, wts_tbl)
-
 # Transmutes daily stock prices to returns by specified period ----
 multi_asset_return_portfolio <- function(stock_price_tbl, period = "monthly"){
     
@@ -117,13 +114,69 @@ wealth_index <- function(return_data, wts_tbl, name_portfolio){
 
 }
 
+# Bind the portfolio ----
+bind_portfolio <- function(data, data_2){
+  
+  data %>% 
+    bind_rows(data_2)
+  
+}
+
 # Plot the portfolio ----
+plot_portfolio <- function(data, interactive = TRUE, theme = theme_tq()){
+  
+  theme_set(theme)
+  
+  
+  g <- data %>% 
+    mutate(portfolio = as.factor(portfolio) %>% fct_reorder(investment.growth),
+           label_text = str_glue("Portfolio: {str_to_title(portfolio)}
+                                 Investment: {scales::dollar(investment.growth, accuracy = 1)}
+                                 Growth %: {scales::percent(portfolio.wealthindex - 1, accuracy = 0.01)}")) %>% 
+    ggplot(aes(x = date, y = investment.growth, col = portfolio)) +
+    geom_point(aes(text = label_text), size = 0.1) + #Must indicate label_text for tooltip to showup 
+    geom_line() + 
+    
+    # Addition of Global Financial Crisis vertical line in Sept 2008
+    geom_vline(xintercept = as.numeric(as.Date("2008-09-01")), linetype = "dotted", color = "red", size = 1.5) +
+    annotate("text", x =  as.Date("2008-09-01") + 1200, y = 23000, label = "2008 Financial Crisis", color = "red") + 
+
+    scale_color_tq() + 
+    scale_y_continuous(labels = scales::dollar_format()) + 
+    labs(title = "Portfolio vs Benchmark (SP500)",
+         x = "",
+         y = "")
+  
+  if(interactive){
+    
+    return(ggplotly(g, tooltip = "text"))
+    
+  } else{
+    
+    return(g)
+  }
+  
+}
 
 
+## Format table ----
+format_table <- function(symbols, w){
+  
+  tibble(symbols, w) %>% 
+    `colnames<-`(c("Ticker", "Weights")) %>% 
+    mutate(Weights = scales::percent(Weights, 
+                                    accuracy = 0.1))
+}
+
+format_table(symbols, w)
+format_table("SP500", 1)
+
+p_load(stringr)
+p_load(forcats)
 # All seasons portfolio ----
 all_seasons_data <- multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>% 
   multi_asset_return_portfolio(period = "monthly") %>% 
-  wealth_index(wts_tbl = wts_tbl, name_portfolio = "all_seasons")
+  wealth_index(wts_tbl = wts_tbl, name_portfolio = "all seasons")
 
 # Start Date of all seasons portfolio
 min_date <- all_seasons_data %>%   
@@ -137,4 +190,8 @@ sp500_data <- multi_asset_price_portfolio(symbols = "^GSPC",
                                           start = min_date, 
                                           wts_tbl) %>% 
   multi_asset_return_portfolio(period = "monthly") %>% 
-  wealth_index(wts_tbl = wts_tbl, name_portfolio = "sp500")
+  wealth_index(wts_tbl = wts_tbl, name_portfolio = "SP500")
+
+# Combine data
+bind_portfolio(all_seasons_data, sp500_data) %>% 
+  plot_portfolio(interactive = TRUE)
