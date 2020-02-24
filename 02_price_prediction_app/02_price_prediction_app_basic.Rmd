@@ -133,11 +133,6 @@ actionButton("go", "Submit") # Enables use of eventReactive() functions
 ```
 
 
-Column {data-width=650}
------------------------------------------------------------------------
-
-### Portfolio with User Input
-
 ```{r}
 
 portfolio_returns <- eventReactive(input$go, {
@@ -162,7 +157,7 @@ portfolio_returns <- eventReactive(input$go, {
 # All seasons portfolio ----
 all_seasons_data <- multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>% 
   multi_asset_return_portfolio(period = "monthly") %>% 
-  wealth_index(wts_tbl = wts_tbl, name_portfolio = "all seasons")
+  wealth_index(wts_tbl = wts_tbl, name_portfolio = "test portfolio")
 
 # Start Date of all seasons portfolio
 min_date <- all_seasons_data %>%   
@@ -176,14 +171,14 @@ sp500_data <- multi_asset_price_portfolio(symbols = input$bench_stock,
                                           start = min_date, 
                                           wts_tbl) %>% 
   multi_asset_return_portfolio(period = "monthly") %>% 
-  wealth_index(wts_tbl = wts_tbl, name_portfolio = "SP500")
+  wealth_index(wts_tbl = wts_tbl, name_portfolio = input$bench_stock)
 
 # Combine data
 bind_portfolio(all_seasons_data, sp500_data) 
 })
 
 # renderDataTable(expr = portfolio_returns())
-portfolio_returns 
+# portfolio_returns 
 ```
 
 
@@ -253,16 +248,45 @@ Column {data-width=350}
 
 ```{r}
 
-format_table(symbols, w)
+first_portfolio <- eventReactive(input$go, {
+  
+  symbols <- c(input$stock1, 
+               input$stock2,
+               input$stock3,
+               input$stock4,
+               input$stock5)
+  
+  end <- input$end_date
+  start <- input$start_date
+  
+  w <- c(input$w1/100,
+         input$w2/100,
+         input$w3/100,
+         input$w4/100,
+         input$w5/100)
+  
+  wts_tbl <- tibble(symbols, w)
+  
+  format_table(symbols, w)
+})
+
+first_portfolio
 
 ```
 
 ### Tickers and Weighting Used in Second Portfolio
 
 ```{r}
+second_portfolio <- eventReactive(input$go, {
+  
+  symbols <- input$bench_stock
+  
+  w <- 1
+  
+  format_table(symbols, w)
+})
 
-format_table("^GSPC", 1)
-
+second_portfolio
 
 ```
 
