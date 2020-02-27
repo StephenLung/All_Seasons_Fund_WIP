@@ -8,12 +8,16 @@ output:
 ---
 
 ```{r setup, include=FALSE}
+setwd("C:/Users/steph/Dropbox/Business University Science/Personal Portfolio/WIP/All_Seasons_Fund_WIP")
 library(flexdashboard)
 library(pacman)
 
 pacman::p_load(
   # App
   "flexdashboard",
+  "shiny",
+  "shinyjs",
+  "shinyWidgets",
   
   # Core
   "tidyquant",
@@ -39,7 +43,8 @@ pacman::p_load(
 )
 
 # Scripts
-source("../01_Scripts_Flex/wealth_index.R")
+# source("../01_Scripts_Flex/wealth_index.R")
+source("01_Scripts_Flex/wealth_index.R")
 
 ```
 
@@ -49,10 +54,15 @@ Column {.sidebar}
 Please enter the stocks and weights you would like to evaluate
 
 ```{r}
+# 
+useShinyjs(rmd = TRUE)
+
 # First Portfolio Input
 fluidRow( #creates the input row
   column(6, #creates a column with length 6
-         textInput("stock1", "Stock 1", "VTI")), #creates the text input field
+         textInput(inputId = "stock1", 
+                   label = "Stock 1", 
+                   value = "VTI")), #creates the text input field
   column(5,
          numericInput("w1", "Portf. %", 30,
                       min = 1, max = 100))
@@ -107,7 +117,7 @@ fluidRow(
 # Benchmark Portfolio Input
 fluidRow(
   column(10,
-         textInput("bench_stock", "Benchmark Stock", "^GSPC"))
+         textInput("bench_stock", "Benchmark Stock", "SPY"))
 )
 
 # User input Start Date
@@ -128,14 +138,70 @@ fluidRow(
                    format = "yyyy-mm-dd"))
 )
 
-actionButton("go", "Submit") # Enables use of eventReactive() functions
+
+hr()
+br()
+
+# Submit button
+actionButton(inputId = "submit", 
+             label = "Submit", 
+             icon = icon(name = "piggy-bank",
+                         lib = "font-awesome")) # Enables use of eventReactive() functions
+# Reset button
+actionButton(inputId = "reset",
+             label = "Reset",
+             icon = icon("sync",
+                         lib = "font-awesome")) 
+
+# Once reset button is executed, original fields are recovered
+observeEvent(eventExpr = input$reset,
+             handlerExpr = {
+               
+               # recover text fields
+               updateTextInput(session = session,
+                                 inputId = "stock1",
+                                 value = "VTI")
+               updateTextInput(session = session,
+                                 inputId = "stock2",
+                                 value = "TLT")
+               updateTextInput(session = session,
+                                 inputId = "stock3",
+                                 value = "IEF")
+               updateTextInput(session = session,
+                                 inputId = "stock4",
+                                 value = "GLD")
+               updateTextInput(session = session,
+                                 inputId = "stock5",
+                                 value = "DBC")
+               # Recover percent fields
+               updateNumericInput(session = session,
+                                  inputId = "w1",
+                                  value = 30)
+               updateNumericInput(session = session,
+                                  inputId = "w2",
+                                  value = 40)
+              updateNumericInput(session = session,
+                                  inputId = "w3",
+                                  value = 15)
+              updateNumericInput(session = session,
+                                  inputId = "w4",
+                                  value = 7.5)
+              updateNumericInput(session = session,
+                                  inputId = "w5",
+                                  value = 7.5)
+              
+              delay(ms = 500, expr = {
+                click(id = "submit")
+              })
+              
+             })
 
 ```
 
 
 ```{r}
-
-portfolio_returns <- eventReactive(input$go, {
+# Wealth Index based on portfolio returns
+portfolio_returns <- eventReactive(input$submit, {
   
   symbols <- c(input$stock1, 
                input$stock2,
@@ -175,17 +241,70 @@ sp500_data <- multi_asset_price_portfolio(symbols = input$bench_stock,
 
 # Combine data
 bind_portfolio(all_seasons_data, sp500_data) 
-})
+}, 
 
-# renderDataTable(expr = portfolio_returns())
-# portfolio_returns 
+# Renders on load
+ignoreNULL = FALSE
+)
+
+# Asset returns
+portfolio_prices <- eventReactive(eventExpr = input$submit,
+                                  valueExpr = {
+                                      symbols <- c(input$stock1, 
+                                                   input$stock2,
+                                                   input$stock3,
+                                                   input$stock4,
+                                                   input$stock5)
+                                      
+                                      end     <- input$end_date
+                                      start   <- input$start_date
+                                      
+                                      w       <- c(input$w1/100,
+                                             input$w2/100,
+                                             input$w3/100,
+                                             input$w4/100,
+                                             input$w5/100)
+                                      
+                                      wts_tbl <- tibble(symbols, w)
+      
+                                      # Returns by ticker
+                                      all_seasons_data <- multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>% 
+                                        multi_asset_return_portfolio(period = "monthly")
+                                  })
+
+# Setting up rolling sd by window 
+port_rolling_sd_tq <- eventReactive(eventExpr = input$submit,
+                                    valueExpr = {
+                                      
+                                      portfolio_prices <- portfolio_prices()
+                                      # Portfolio returns based on weighting
+                                      portfolio_returns_tq_rebalance <- portfolio_prices %>% 
+                                        group_by(symbol) %>% 
+                                        tq_portfolio(assets_col = symbol,
+                                                     returns_col = returns,
+                                                     weights = w,
+                                                     col_rename = "returns",
+                                                     rebalance_on = "months") #input$rebalance ----
+                                      
+                                      # Portfolio rolling sd based on user specified window
+                                      portfolio_returns_tq_rebalance %>% 
+                                        tq_mutate(mutate_fun = rollapply,
+                                                  width = 24,   #input$window ----
+                                                  FUN = sd,
+                                                  col_rename = ("rolling_sd")) %>%  
+                                        na.omit() %>% 
+                                        select(date, rolling_sd)
+                                  })
+
+
+
 ```
 
 
-Column {data-width=650}
+Column {.tabset .tabset-fade data-width=650}
 -----------------------------------------------------------------------
 
-### Portfolio vs Benchmark
+### Portfolio vs Benchmark (Plotly)
 
 ```{r}
 renderPlotly({
@@ -213,33 +332,34 @@ renderPlotly({
 ```
 
 
-<!-- # ```{r} -->
-<!-- #  -->
-<!-- #  -->
-<!-- # # All seasons portfolio ---- -->
-<!-- # all_seasons_data <- multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>%  -->
-<!-- #   multi_asset_return_portfolio(period = "monthly") %>%  -->
-<!-- #   wealth_index(wts_tbl = wts_tbl, name_portfolio = "all seasons") -->
-<!-- #  -->
-<!-- # # Start Date of all seasons portfolio -->
-<!-- # min_date <- all_seasons_data %>%    -->
-<!-- #   summarise(min_date = min(date),  -->
-<!-- #             max_date = max(date)) %>%  -->
-<!-- #   pull(min_date) -->
-<!-- #  -->
-<!-- # # S&P500 portfolio ---- -->
-<!-- # sp500_data <- multi_asset_price_portfolio(symbols = "^GSPC",  -->
-<!-- #                                           end,  -->
-<!-- #                                           start = min_date,  -->
-<!-- #                                           wts_tbl) %>%  -->
-<!-- #   multi_asset_return_portfolio(period = "monthly") %>%  -->
-<!-- #   wealth_index(wts_tbl = wts_tbl, name_portfolio = "SP500") -->
-<!-- #  -->
-<!-- # # Combine data -->
-<!-- # bind_portfolio(all_seasons_data, sp500_data) %>%  -->
-<!-- #   plot_portfolio(interactive = TRUE) -->
-<!-- #  -->
-<!-- # ``` -->
+### Rolling Standard Deviation (Highcharter)
+
+```{r}
+renderHighchart({
+  
+  port_rolling_sd_hc <- port_rolling_sd_tq() %>% 
+    tk_xts(date_col = date) %>% 
+    round(., 4) * 100
+  
+  highchart(type = "stock") %>% 
+    hc_title(text = "All Seasons Rolling Volatility") %>% 
+    hc_yAxis(title = list(text = "Volatility"),
+             labels = list(format = "{value}%"),
+             opposite = FALSE) %>% 
+    hc_add_series(port_rolling_sd_hc,
+                  name = "Portfolio Volatility",
+                  color = palette_light()[[1]]) %>% 
+    hc_navigator(enabled = FALSE) %>% 
+    hc_scrollbar(enabled = FALSE) %>% 
+    hc_exporting(enabled = TRUE)
+  
+  
+  
+  
+})
+```
+
+
 
 Column {data-width=350}
 -----------------------------------------------------------------------
@@ -248,45 +368,56 @@ Column {data-width=350}
 
 ```{r}
 
-first_portfolio <- eventReactive(input$go, {
-  
-  symbols <- c(input$stock1, 
+first_portfolio <- eventReactive(input$submit, {
+
+  symbols <- c(input$stock1,
                input$stock2,
                input$stock3,
                input$stock4,
                input$stock5)
-  
+
   end <- input$end_date
   start <- input$start_date
-  
+
   w <- c(input$w1/100,
          input$w2/100,
          input$w3/100,
          input$w4/100,
          input$w5/100)
-  
-  wts_tbl <- tibble(symbols, w)
-  
-  format_table(symbols, w)
-})
 
-first_portfolio
+  wts_tbl <- tibble(symbols, w)
+
+  format_table(symbols, w)
+},
+
+# Renders on load
+ignoreNULL = FALSE
+)
+
+# Render and output to the UI
+output$first_port <- renderTable(first_portfolio())
+tableOutput("first_port")
 
 ```
 
 ### Tickers and Weighting Used in Second Portfolio
 
 ```{r}
-second_portfolio <- eventReactive(input$go, {
+second_portfolio <- eventReactive(input$submit, {
   
   symbols <- input$bench_stock
   
   w <- 1
   
   format_table(symbols, w)
-})
+},
 
-second_portfolio
+# Renders on load
+ignoreNULL = FALSE)
+
+# Render and output to the UI
+output$second_port <- renderTable(second_portfolio())
+tableOutput("second_port")
 
 ```
 
