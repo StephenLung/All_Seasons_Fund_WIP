@@ -248,7 +248,7 @@ ignoreNULL = FALSE
 )
 
 # Asset returns
-portfolio_prices <- eventReactive(eventExpr = input$submit,
+asset_returns <- eventReactive(eventExpr = input$submit,
                                   valueExpr = {
                                       symbols <- c(input$stock1, 
                                                    input$stock2,
@@ -270,15 +270,40 @@ portfolio_prices <- eventReactive(eventExpr = input$submit,
                                       # Returns by ticker
                                       all_seasons_data <- multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>% 
                                         multi_asset_return_portfolio(period = "monthly")
-                                  })
+                                  }, 
+                               # Renders on load
+                               ignoreNULL = FALSE
+                               )
+benchmark_rolling_sd_tq <- eventReactive(eventExpr = input$submit,
+                                  valueExpr = {
+                                    
+                                    # Benchmark returns 
+                                    multi_asset_price_portfolio(symbols = input$bench_stock, 
+                                          end, 
+                                          start = min_date, 
+                                          wts_tbl) %>% 
+                                    multi_asset_return_portfolio(period = "monthly") %>% 
+                                      
+                                    # Benchmark rolling sd based on user specified window
+                                        tq_mutate(mutate_fun = rollapply,
+                                                  width = 24,   #input$window ----
+                                                  FUN = sd,
+                                                  col_rename = ("rolling_sd")) %>%  
+                                        na.omit() %>% 
+                                        select(date, rolling_sd)
+                                    
+                                    },
+                               # Renders on load
+                               ignoreNULL = FALSE                                  
+                                  )
 
 # Setting up rolling sd by window 
 port_rolling_sd_tq <- eventReactive(eventExpr = input$submit,
                                     valueExpr = {
                                       
-                                      portfolio_prices <- portfolio_prices()
+                                      asset_returns <- asset_returns()
                                       # Portfolio returns based on weighting
-                                      portfolio_returns_tq_rebalance <- portfolio_prices %>% 
+                                      portfolio_returns_tq_rebalance <- asset_returns %>% 
                                         group_by(symbol) %>% 
                                         tq_portfolio(assets_col = symbol,
                                                      returns_col = returns,
@@ -341,20 +366,24 @@ renderHighchart({
     tk_xts(date_col = date) %>% 
     round(., 4) * 100
   
+  benchmarket_rolling_sd_hc <- benchmark_rolling_sd_tq() %>% 
+    tk_xts(date_col = date) %>% 
+    round(., 4) * 100
+  
   highchart(type = "stock") %>% 
     hc_title(text = "All Seasons Rolling Volatility") %>% 
     hc_yAxis(title = list(text = "Volatility"),
              labels = list(format = "{value}%"),
              opposite = FALSE) %>% 
+    hc_add_series(benchmarket_rolling_sd_hc,
+                  name = "Benchmark Volatility",
+                  color = palette_light()[[1]]) %>% 
     hc_add_series(port_rolling_sd_hc,
                   name = "Portfolio Volatility",
-                  color = palette_light()[[1]]) %>% 
+                  color = palette_light()[[2]]) %>% 
     hc_navigator(enabled = FALSE) %>% 
     hc_scrollbar(enabled = FALSE) %>% 
     hc_exporting(enabled = TRUE)
-  
-  
-  
   
 })
 ```
