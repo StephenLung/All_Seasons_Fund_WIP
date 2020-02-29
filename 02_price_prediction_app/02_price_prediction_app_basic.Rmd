@@ -3,7 +3,7 @@ title: "All Seasons Prediction App"
 runtime: shiny
 output: 
   flexdashboard::flex_dashboard:
-    orientation: columns
+    orientation: column
     vertical_layout: fill
 ---
 
@@ -117,21 +117,29 @@ fluidRow(
 # Benchmark Portfolio Input
 fluidRow(
   column(10,
-         textInput("bench_stock", "Benchmark Stock", "SPY"))
+         textInput("bench_stock", "Benchmark Stock", "^GSPC"))
 )
 
-# User input Start Date
+# User input Start Date and rolling window
 fluidRow(
-  column(7,
+  column(6,
          dateInput("start_date",
                    "Starting Date",
                    "2006-02-01",
-                   format = "yyyy-mm-dd"))
+                   format = "yyyy-mm-dd")),
+  column(4, 
+         numericInput("window",
+                   "Window",
+                   12,
+                   min = 3,
+                   max = 35,
+                   step = 1
+                   ))
 )
 
 # User Input End Date
 fluidRow(
-  column(7,
+  column(6,
          dateInput("end_date",
                    "End Date",
                    today(),
@@ -201,7 +209,7 @@ observeEvent(eventExpr = input$reset,
 
 ```{r}
 # Wealth Index based on portfolio returns
-portfolio_returns <- eventReactive(input$submit, {
+port_wealth_index <- eventReactive(input$submit, {
   
   symbols <- c(input$stock1, 
                input$stock2,
@@ -274,6 +282,7 @@ asset_returns <- eventReactive(eventExpr = input$submit,
                                # Renders on load
                                ignoreNULL = FALSE
                                )
+
 benchmark_rolling_sd_tq <- eventReactive(eventExpr = input$submit,
                                   valueExpr = {
                                     
@@ -286,15 +295,15 @@ benchmark_rolling_sd_tq <- eventReactive(eventExpr = input$submit,
                                       
                                     # Benchmark rolling sd based on user specified window
                                         tq_mutate(mutate_fun = rollapply,
-                                                  width = 24,   #input$window ----
+                                                  width = input$window, 
                                                   FUN = sd,
                                                   col_rename = ("rolling_sd")) %>%  
                                         na.omit() %>% 
                                         select(date, rolling_sd)
                                     
                                     },
-                               # Renders on load
-                               ignoreNULL = FALSE                                  
+                                   # Renders on load
+                                   ignoreNULL = FALSE                                  
                                   )
 
 # Setting up rolling sd by window 
@@ -309,19 +318,120 @@ port_rolling_sd_tq <- eventReactive(eventExpr = input$submit,
                                                      returns_col = returns,
                                                      weights = w,
                                                      col_rename = "returns",
-                                                     rebalance_on = "months") #input$rebalance ----
+                                                     rebalance_on = input$rebalance)
                                       
                                       # Portfolio rolling sd based on user specified window
                                       portfolio_returns_tq_rebalance %>% 
                                         tq_mutate(mutate_fun = rollapply,
-                                                  width = 24,   #input$window ----
+                                                  width = input$window,
                                                   FUN = sd,
                                                   col_rename = ("rolling_sd")) %>%  
                                         na.omit() %>% 
                                         select(date, rolling_sd)
-                                  })
+                                  },
+                                  # Renders on load
+                                  ignoreNULL = FALSE )
 
+# Setting up portfolio returns
+portfolio_returns <- eventReactive(eventExpr = input$submit,
+              valueExpr = {
+                
+                symbols <- c(input$stock1, 
+                             input$stock2,
+                             input$stock3,
+                             input$stock4,
+                             input$stock5)
+                
+                end     <- input$end_date
+                start   <- input$start_date
+                
+                w       <- c(input$w1/100,
+                       input$w2/100,
+                       input$w3/100,
+                       input$w4/100,
+                       input$w5/100)
+                
+                wts_tbl <- tibble(symbols, w)
 
+                
+                all_seasons_data <- asset_returns() 
+                
+                all_seasons_data %>% 
+                  portfolio_return(wts_tbl = wts_tbl, 
+                                    name_portfolio = "All Seasons",
+                                    rebalance = "years")
+                  
+                
+              })
+
+# Setting up Rolling skewness
+port_rolling_skew_hc <- eventReactive(eventExpr = input$submit,
+              valueExpr = {
+
+                symbols <- c(input$stock1,
+                             input$stock2,
+                             input$stock3,
+                             input$stock4,
+                             input$stock5)
+
+                end     <- input$end_date
+                start   <- input$start_date
+
+                w       <- c(input$w1/100,
+                       input$w2/100,
+                       input$w3/100,
+                       input$w4/100,
+                       input$w5/100)
+
+                wts_tbl <- tibble(symbols, w)
+                window <- input$window
+
+                benchmark_symbol <- input$bench_stock
+                benchmark_w <- 1
+
+                rolling_skew_tq(symbols = symbols,
+                                end = end,
+                                start = start,
+                                wts_tbl = wts_tbl,
+                                name_portfolio = "Portfolio",
+                                window = window)
+              },
+              # Renders on load
+              ignoreNULL = FALSE )
+
+bench_rolling_skew_hc <- eventReactive(eventExpr = input$submit,
+              valueExpr = {
+
+                symbols <- c(input$stock1,
+                             input$stock2,
+                             input$stock3,
+                             input$stock4,
+                             input$stock5)
+
+                end     <- input$end_date
+                start   <- input$start_date
+
+                w       <- c(input$w1/100,
+                       input$w2/100,
+                       input$w3/100,
+                       input$w4/100,
+                       input$w5/100)
+
+                wts_tbl <- tibble(symbols, w)
+                window <- input$window
+
+                benchmark_symbol <- input$bench_stock
+                benchmark_w <- 1
+
+                rolling_skew_tq(symbols = benchmark_symbol,
+                                end = end,
+                                start = min_date,
+                                wts_tbl = benchmark_w,
+                                name_portfolio = "Benchmark",
+                                window = window)
+              },
+              # Renders on load
+              ignoreNULL = FALSE )
 
 ```
 
@@ -333,7 +443,7 @@ Column {.tabset .tabset-fade data-width=650}
 
 ```{r}
 renderPlotly({
-  (portfolio_returns() %>% 
+  (port_wealth_index() %>% 
     mutate(portfolio = as.factor(portfolio) %>% fct_reorder(investment.growth),
            label_text = str_glue("Portfolio: {str_to_title(portfolio)}
                                  Investment: {scales::dollar(investment.growth, accuracy = 1)}
@@ -371,8 +481,9 @@ renderHighchart({
     round(., 4) * 100
   
   highchart(type = "stock") %>% 
-    hc_title(text = "All Seasons Rolling Volatility") %>% 
-    hc_yAxis(title = list(text = "Volatility"),
+    hc_title(text = "All Seasons Rolling Standard Deviation") %>% 
+    hc_subtitle(text = str_glue("Standard Deviation measures the dispersion of returns around the mean. The higher the dispersion, the more risky or volatile the portfolio. Rolling standard deviation over {input$window} periods")) %>% 
+    hc_yAxis(title = list(text = str_glue(" Rolling {input$window} month standard deviation")),
              labels = list(format = "{value}%"),
              opposite = FALSE) %>% 
     hc_add_series(benchmarket_rolling_sd_hc,
@@ -388,9 +499,34 @@ renderHighchart({
 })
 ```
 
+### Rolling Skewness (Highcharter)
+
+```{r}
+# renderTable(port_rolling_skew_hc())
 
 
-Column {data-width=350}
+renderHighchart({
+  highchart(type = "stock") %>%
+    hc_title(text = "Rolling Skew") %>%
+    hc_subtitle(text = str_glue("Skewness measures the symmetry or more precisely, the lack of symmetry, around the mean. If returns are positively skewed, it implies numerous small negative returns and few large positive returns. vice versa. A portfolio should stay away from negatively skewed as it implies a portfolio risk of rare but large losses. Rolling skewness over {input$window} periods")) %>% 
+    hc_yAxis(title = list(text = str_glue(" Rolling {input$window} month skewness")),
+             opposite = FALSE,
+             max = 3, min = -3) %>%
+    hc_add_series(bench_rolling_skew_hc(),
+                  name = "Benchmark",
+                  color = palette_light()[[1]]) %>%
+    hc_add_series(port_rolling_skew_hc(),
+                  name = "Portfolio Skewness",
+                  color = palette_light()[[2]]) %>%
+    hc_navigator(enabled = FALSE) %>%
+    hc_scrollbar(enabled = FALSE) %>%
+    hc_exporting(enabled = TRUE)
+
+})
+```
+
+
+Column {data-width=175}
 -----------------------------------------------------------------------
 
 ### Tickers Used in First Portfolio

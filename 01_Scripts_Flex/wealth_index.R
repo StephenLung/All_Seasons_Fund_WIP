@@ -3,6 +3,7 @@ p_load(dplyr,
        rlang)
 
 symbols <- c("VTI", "TLT", "IEF", "GLD", "DBC")
+tech_symbols <- c("FB", "AMZN", "AAPL", "NFLX", "GOOG")
 end     <- today()
 start   <- end - years(20) + days(1)
 w       <- c(0.3,
@@ -11,6 +12,12 @@ w       <- c(0.3,
              0.075,
              0.075)
 wts_tbl <- tibble(symbols, w)
+window <- 24
+
+benchmark_symbols <- "^GSPC"
+benchmark_w <- 1
+benchmark_tbl <- tibble(benchmark_symbols,
+                        benchmark_w)
 
 
 # Pulls a full list of daily stock prices ----
@@ -77,7 +84,7 @@ multi_asset_return_portfolio <- function(stock_price_tbl, period = "monthly"){
     
 }
 
-# Creates a portfolio given the weights ----
+# Creates a wealth_index given the weights ----
 wealth_index <- function(return_data, wts_tbl, name_portfolio){
   
   name_portfolio <- as_name(name_portfolio)
@@ -195,3 +202,76 @@ sp500_data <- multi_asset_price_portfolio(symbols = "^GSPC",
 # Combine data
 bind_portfolio(all_seasons_data, sp500_data) %>% 
   plot_portfolio(interactive = TRUE)
+
+
+# Creates a portfolio return given the weights ----
+portfolio_return <- function(return_data, wts_tbl, name_portfolio, rebalance = "years"){
+  
+  name_portfolio <- as_name(name_portfolio)
+  
+  # Determine # of tickers
+  symbol_length <- return_data %>% 
+    select(symbol) %>% 
+    unique() %>% 
+    pull(symbol)
+  
+  # One ticker will not require table weights for portfolio return
+  if(length(symbol_length) == 1){
+    
+    return_data %>% 
+      mutate(symbol = name_portfolio) 
+  }
+  
+  # 1+ ticker will require table weights for portfolio return
+  else {
+    
+    return_data %>% 
+      tq_portfolio(assets_col = symbol,
+                   returns_col = returns,
+                   weights = wts_tbl,
+                   rebalance_on = rebalance,
+                   col_rename = "returns") %>% 
+      add_column(symbol = name_portfolio, .before = 1) 
+  }
+  
+}
+
+# Crates rolling kurtosis ----
+rolling_skew_tq <- function(symbols, end, start, wts_tbl, name_portfolio, window){
+  
+  multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>%
+    multi_asset_return_portfolio(period = "monthly") %>%
+    portfolio_return(wts_tbl = wts_tbl,
+                     name_portfolio = name_portfolio,
+                     rebalance = "years") %>%
+    tq_mutate(select = returns,
+              mutate_fun = rollapply,
+              width = window,
+              FUN = skewness,
+              col_rename = "skewness") %>% 
+    na.omit() %>% 
+    select(-returns) %>% 
+    tk_xts(date_var = date)
+}
+
+# Crates rolling kurtosis ----
+rolling_kurt_tq <- function(symbols, end, start, wts_tbl, window){
+  
+  multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>% 
+  multi_asset_return_portfolio(period = "monthly") %>% 
+  portfolio_return(wts_tbl = wts_tbl, 
+                   name_portfolio = "All Seasons",
+                   rebalance = "years") %>% 
+  tq_mutate(select = returns,
+            mutate_fun = rollapply,
+            width = window,
+            FUN = kurtosis,
+            col_rename = "kurtosis") %>% 
+  na.omit()
+}
+
+rolling_skew_tq(symbols = benchmark_symbols, end, start, wts_tbl = benchmark_w, name_portfolio = "benchmark", window) %>% 
+  tk_xts(date_var = date)
+
+
+  
