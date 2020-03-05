@@ -110,7 +110,15 @@ fluidRow(
          selectInput("rebalance", "Rebalance Frequency",
                      c("Yearly" = "years",
                        "Monthly" = "months",
-                       "Weekly" = "weeks")))
+                       "Weekly" = "weeks"))), 
+  column(5, 
+         numericInput("window",
+                   "Window",
+                   12,
+                   min = 3,
+                   max = 35,
+                   step = 1
+                   ))
 )
 
 
@@ -122,30 +130,31 @@ fluidRow(
 
 # User input Start Date and rolling window
 fluidRow(
-  column(6,
+  column(7,
          dateInput("start_date",
                    "Starting Date",
                    "2006-02-01",
-                   format = "yyyy-mm-dd")),
-  column(4, 
-         numericInput("window",
-                   "Window",
-                   12,
-                   min = 3,
-                   max = 35,
-                   step = 1
-                   ))
-)
+                   format = "yyyy-mm-dd")))
+
 
 # User Input End Date
 fluidRow(
-  column(6,
+  column(7,
          dateInput("end_date",
                    "End Date",
                    today(),
                    format = "yyyy-mm-dd"))
 )
 
+# User Input risk free rate
+fluidRow(
+  column(6,
+         numericInput("rfr",
+                   "Risk Free Rate %",
+                   0.0003,
+                   min = 0,
+                   max= 1)
+))
 
 hr()
 br()
@@ -362,7 +371,45 @@ portfolio_returns <- eventReactive(eventExpr = input$submit,
                                     rebalance = "years")
                   
                 
-              })
+              },
+                                  # Renders on load
+                                  ignoreNULL = FALSE )
+
+# Setting up benchmark returns
+benchmark_returns <- eventReactive(eventExpr = input$submit,
+              valueExpr = {
+
+                symbols <- c(input$stock1,
+                             input$stock2,
+                             input$stock3,
+                             input$stock4,
+                             input$stock5)
+
+                end     <- input$end_date
+                start   <- input$start_date
+
+                w       <- c(input$w1/100,
+                       input$w2/100,
+                       input$w3/100,
+                       input$w4/100,
+                       input$w5/100)
+
+                wts_tbl <- tibble(symbols, w)
+                window <- input$window
+
+                benchmark_symbol <- input$bench_stock
+                benchmark_w <- 1
+                
+                multi_asset_price_portfolio(symbols = input$bench_stock, 
+                                            end = end,
+                                            start = min_date,
+                                            wts_tbl = benchmark_w) %>% 
+                portfolio_return(wts_tbl = benchmark_w,
+                                 name_portfolio = "benchmark")
+              },
+              # Renders on load
+              ignoreNULL = FALSE)
+              
 
 # Setting up Rolling skewness
 port_rolling_skew_hc <- eventReactive(eventExpr = input$submit,
@@ -432,6 +479,183 @@ bench_rolling_skew_hc <- eventReactive(eventExpr = input$submit,
               },
               # Renders on load
               ignoreNULL = FALSE )
+
+# Setting up Rolling kurtosis
+port_rolling_kurt_hc <- eventReactive(eventExpr = input$submit,
+              valueExpr = {
+
+                symbols <- c(input$stock1,
+                             input$stock2,
+                             input$stock3,
+                             input$stock4,
+                             input$stock5)
+
+                end     <- input$end_date
+                start   <- input$start_date
+
+                w       <- c(input$w1/100,
+                       input$w2/100,
+                       input$w3/100,
+                       input$w4/100,
+                       input$w5/100)
+
+                wts_tbl <- tibble(symbols, w)
+                window <- input$window
+
+                benchmark_symbol <- input$bench_stock
+                benchmark_w <- 1
+
+                rolling_kurt_tq(symbols = symbols,
+                                end = end,
+                                start = start,
+                                wts_tbl = wts_tbl,
+                                name_portfolio = "Portfolio",
+                                window = window)
+              },
+              # Renders on load
+              ignoreNULL = FALSE )
+
+bench_rolling_kurt_hc <- eventReactive(eventExpr = input$submit,
+              valueExpr = {
+
+                symbols <- c(input$stock1,
+                             input$stock2,
+                             input$stock3,
+                             input$stock4,
+                             input$stock5)
+
+                end     <- input$end_date
+                start   <- input$start_date
+
+                w       <- c(input$w1/100,
+                       input$w2/100,
+                       input$w3/100,
+                       input$w4/100,
+                       input$w5/100)
+
+                wts_tbl <- tibble(symbols, w)
+                window <- input$window
+
+                benchmark_symbol <- input$bench_stock
+                benchmark_w <- 1
+
+                rolling_kurt_tq(symbols = benchmark_symbol,
+                                end = end,
+                                start = min_date,
+                                wts_tbl = benchmark_w,
+                                name_portfolio = "Benchmark",
+                                window = window)
+              },
+              # Renders on load
+              ignoreNULL = FALSE )
+
+# Adjust rfr and window input into variables
+rfr <- eventReactive(eventExpr = input$submit,
+                     valueExpr = {
+                       input$rfr/100
+                     })
+window <- eventReactive(eventExpr = input$submit,
+                        valueExpr = {
+                          input$window
+                        })
+
+# Calculate portfolio Sharpe Ratio
+portfolio_sharpe_hc <- eventReactive(eventExpr = input$submit,
+              valueExpr = {
+                
+                symbols <- c(input$stock1,
+                             input$stock2,
+                             input$stock3,
+                             input$stock4,
+                             input$stock5)
+
+                end     <- input$end_date
+                start   <- input$start_date
+
+                w       <- c(input$w1/100,
+                       input$w2/100,
+                       input$w3/100,
+                       input$w4/100,
+                       input$w5/100)
+
+                wts_tbl <- tibble(symbols, w)
+                window <- input$window
+
+                benchmark_symbol <- input$bench_stock
+                benchmark_w <- 1
+                
+                sharpe_ratio_tq(symbols = symbols, end = end, start = start, wts_tbl = wts_tbl, rfr = rfr, 
+                                name_portfolio = "portfolio", name_ratio = "sharpe_ratio") 
+              },
+                                  # Renders on load
+                                  ignoreNULL = FALSE )
+
+# Calculate benchmark Sharpe Ratio
+bench_sharpe_ratio_tq <- eventReactive(eventExpr = input$submit,
+              valueExpr = {
+                
+                symbols <- c(input$stock1,
+                             input$stock2,
+                             input$stock3,
+                             input$stock4,
+                             input$stock5)
+
+                end     <- input$end_date
+                start   <- input$start_date
+
+                w       <- c(input$w1/100,
+                       input$w2/100,
+                       input$w3/100,
+                       input$w4/100,
+                       input$w5/100)
+
+                wts_tbl <- tibble(symbols, w)
+                window <- input$window
+
+                benchmark_symbol <- input$bench_stock
+                benchmark_w <- 1
+                
+                sharpe_tq(symbols = benchmark_symbol, end = end, start = min_date, wts_tbl = benchmark_w, rfr = rfr, name_ratio = "sharpe_ratio")
+              },
+                                  # Renders on load
+                                  ignoreNULL = FALSE )
+
+# Calculate rolling market Sharpe Ratio
+rolling_sharpe_ratio <- eventReactive(eventExpr = input$submit,
+              valueExpr = {
+                
+                symbols <- c(input$stock1,
+                             input$stock2,
+                             input$stock3,
+                             input$stock4,
+                             input$stock5)
+
+                end     <- input$end_date
+                start   <- input$start_date
+
+                w       <- c(input$w1/100,
+                       input$w2/100,
+                       input$w3/100,
+                       input$w4/100,
+                       input$w5/100)
+
+                wts_tbl <- tibble(symbols, w)
+                window <- input$window
+
+                benchmark_symbol <- input$bench_stock
+                benchmark_w <- 1
+                
+                sharpe_tq_2 <- function(df){
+                                            SharpeRatio(df,
+                                                        Rf = rfr,
+                                                        FUN = "StdDev")
+                }
+                
+                sharpe_tq_roll(symbols, end, start, wts_tbl, name_portfolio = "portfolio", name_ratio = "sharpe_ratio")
+                
+              },
+                                  # Renders on load
+                                  ignoreNULL = FALSE )
 
 ```
 
@@ -524,6 +748,45 @@ renderHighchart({
 
 })
 ```
+
+### Rolling Kurtosis (Highcharter)
+
+```{r}
+
+
+renderHighchart({
+  highchart(type = "stock") %>%
+    hc_title(text = "Rolling Kurtosis") %>%
+    hc_subtitle(text = str_glue("Kurtosis measures the degree of portfolio returns appearing in the tail of the distribution. A normal distribution has a kurtosis of 3. Distribution greater than 3 will have more returns on its tail, which implies more negative returns on the left tail and even a risk of a huge downside event. vice versa. An ideal portfolio generally would have negative kurtosis, or less than 3. Rolling skewness over {input$window} periods")) %>% 
+    hc_yAxis(title = list(text = str_glue(" Rolling {input$window} month kurtosis")),
+             opposite = FALSE,
+             max = 5, min = -5) %>%
+    hc_add_series(bench_rolling_kurt_hc(),
+                  name = "Benchmark",
+                  color = palette_light()[[1]]) %>%
+    hc_add_series(port_rolling_kurt_hc(),
+                  name = "Portfolio Skewness",
+                  color = palette_light()[[2]]) %>%
+    hc_navigator(enabled = FALSE) %>%
+    hc_scrollbar(enabled = FALSE) %>%
+    hc_exporting(enabled = TRUE)
+
+})
+```
+
+
+### Rolling Sharpe (Highcharter)
+
+```{r}
+# renderValueBox({
+#   valueBox(value = tags$p(round(portfolio_sharpe(), 4),
+#                          style = "font-size: 70%;"),
+#            color = "primary")
+# })
+
+renderTable(rolling_sharpe_ratio())
+```
+
 
 
 Column {data-width=175}

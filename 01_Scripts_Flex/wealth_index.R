@@ -18,6 +18,7 @@ benchmark_symbols <- "^GSPC"
 benchmark_w <- 1
 benchmark_tbl <- tibble(benchmark_symbols,
                         benchmark_w)
+rfr <- .0003 #risk free rate 0.3% - 10 year treasury rate
 
 
 # Pulls a full list of daily stock prices ----
@@ -236,7 +237,7 @@ portfolio_return <- function(return_data, wts_tbl, name_portfolio, rebalance = "
   
 }
 
-# Crates rolling kurtosis ----
+# Creates rolling kurtosis ----
 rolling_skew_tq <- function(symbols, end, start, wts_tbl, name_portfolio, window){
   
   multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>%
@@ -254,24 +255,71 @@ rolling_skew_tq <- function(symbols, end, start, wts_tbl, name_portfolio, window
     tk_xts(date_var = date)
 }
 
-# Crates rolling kurtosis ----
-rolling_kurt_tq <- function(symbols, end, start, wts_tbl, window){
+# Creates rolling kurtosis ----
+rolling_kurt_tq <- function(symbols, end, start, wts_tbl, name_portfolio, window){
   
   multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>% 
   multi_asset_return_portfolio(period = "monthly") %>% 
   portfolio_return(wts_tbl = wts_tbl, 
-                   name_portfolio = "All Seasons",
+                   name_portfolio = name_portfolio,
                    rebalance = "years") %>% 
   tq_mutate(select = returns,
             mutate_fun = rollapply,
             width = window,
             FUN = kurtosis,
             col_rename = "kurtosis") %>% 
-  na.omit()
+  na.omit() %>% 
+    select(-returns) %>% 
+    tk_xts(date_var = date)
 }
 
 rolling_skew_tq(symbols = benchmark_symbols, end, start, wts_tbl = benchmark_w, name_portfolio = "benchmark", window) %>% 
   tk_xts(date_var = date)
 
+rolling_kurt_tq(symbols = benchmark_symbols, end, start, wts_tbl = benchmark_w, name_portfolio = "benchmark", window) 
 
+# Create Sharpe Ratio ----
+sharpe_ratio_tq <- function(symbols, end, start, wts_tbl, rfr = rfr, name_portfolio, name_ratio = "sharpe_ratio"){
+
+  multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>% 
+    multi_asset_return_portfolio(period = "monthly") %>% 
+    portfolio_return(wts_tbl = wts_tbl,
+                     name_portfolio = name_portfolio,
+                     rebalance = "years") %>% 
+    tq_performance(Ra = returns,
+                   performance_fun = SharpeRatio,
+                   Rf = rfr,
+                   FUN = "StdDev") %>%
+    `colnames<-`(name_ratio)
   
+}
+
+# sharpe_tq(symbols, end, start, wts_tbl, rfr, name_ratio = "sharpe_ratio")
+# sharpe_tq(symbols = benchmark_symbols, end, start, wts_tbl = benchmark_w, name_ratio = "sharpe_ratio")
+
+# Create rolling Sharpe Ratio ----\
+# Part 1 custom function to specify RFR and Sharpe Ratio function
+sharpe_tq_2 <- function(df){
+  SharpeRatio(df,
+              Rf = rfr,
+              FUN = "StdDev")
+}
+
+sharpe_tq_roll <- function(symbols, end, start, wts_tbl, name_portfolio, name_ratio = "sharpe_ratio"){
+
+  multi_asset_price_portfolio(symbols, end, start, wts_tbl) %>%
+    multi_asset_return_portfolio(period = "monthly") %>%
+    portfolio_return(wts_tbl = wts_tbl,
+                     name_portfolio = name_portfolio,
+                     rebalance = "years") %>%
+    tq_mutate(
+      select = returns,
+      mutate_fun = rollapply,
+      width = window,
+      align = "right",
+      FUN = sharpe_tq_2,
+      col_rename = "sharpe_ratio") %>%
+    na.omit()
+
+}
+
