@@ -5,6 +5,7 @@ output:
   flexdashboard::flex_dashboard:
     orientation: column
     vertical_layout: fill
+    css: css/styles-default.css
 ---
 
 ```{r setup, include=FALSE}
@@ -61,10 +62,10 @@ useShinyjs(rmd = TRUE)
 fluidRow( #creates the input row
   column(6, #creates a column with length 6
          textInput(inputId = "stock1", 
-                   label = "Stock 1", 
+                   label = h4("Stock 1"), 
                    value = "VTI")), #creates the text input field
   column(5,
-         numericInput("w1", "Portf. %", 30,
+         numericInput("w1", h4("Portf. %"), 30,
                       min = 1, max = 100))
 )
 
@@ -107,7 +108,7 @@ fluidRow(
 # Portfolio Rebalance Interval
 fluidRow(
   column(6,
-         selectInput("rebalance", "Rebalance Frequency",
+         selectInput("rebalance", "Rebalance Freq",
                      c("Yearly" = "years",
                        "Monthly" = "months",
                        "Weekly" = "weeks"))), 
