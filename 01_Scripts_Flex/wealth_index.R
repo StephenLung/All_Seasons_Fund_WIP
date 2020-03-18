@@ -208,7 +208,7 @@ bind_portfolio(all_seasons_data, sp500_data) %>%
 # Creates a portfolio return given the weights ----
 portfolio_return <- function(return_data, wts_tbl, name_portfolio, rebalance = "years"){
   
-  name_portfolio <- as_name(name_portfolio)
+  # name_portfolio <- as_name(name_portfolio) #not necessary?
   
   # Determine # of tickers
   symbol_length <- return_data %>% 
@@ -322,4 +322,5 @@ sharpe_tq_roll <- function(symbols, end, start, wts_tbl, name_portfolio, name_ra
     na.omit()
 
 }
+
 

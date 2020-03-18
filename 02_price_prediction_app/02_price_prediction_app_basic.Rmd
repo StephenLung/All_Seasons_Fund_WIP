@@ -1,11 +1,12 @@
 ---
-title: "All Seasons Prediction App"
+title: "Portfolio Analytics Prediction App"
 runtime: shiny
 output: 
   flexdashboard::flex_dashboard:
     orientation: column
     vertical_layout: fill
     css: css/styles-default.css
+    logo: img/the5ac.png
 ---
 
 ```{r setup, include=FALSE}
@@ -72,49 +73,56 @@ fluidRow( #creates the input row
 # Second Portfolio Input
 fluidRow(
   column(6,
-         textInput("stock2", "Stock 2", "TLT")),
+         textInput("stock2", h4("Stock 2"), "TLT")),
   column(5,
-         numericInput("w2", "Portf. %", 40,
+         numericInput("w2", h4("Portf. %"), 40,
                       min = 1, max = 100))
 )
 
 # Third Portfolio Input
 fluidRow(
   column(6,
-         textInput("stock3", "Stock 3", "IEF")),
+         textInput("stock3", h4("Stock 3"), "IEF")),
   column(5,
-         numericInput("w3", "Portf. %", 15,
+         numericInput("w3", h4("Portf. %"), 15,
                       min = 1, max = 100))
 )
 
 # Fourth Portfolio Input
 fluidRow(
   column(6,
-         textInput("stock4", "Stock 4", "GLD")),
+         textInput("stock4", h4("Stock 4"), "GLD")),
   column(5,
-         numericInput("w4", "Portf. %", 7.5,
+         numericInput("w4", h4("Portf. %"), 7.5,
                       min = 1, max = 100))
 )
 
 # Fifth Portfolio Input
 fluidRow(
   column(6,
-         textInput("stock5", "Stock 5", "DBC")),
+         textInput("stock5", h4("Stock 5"), "DBC")),
   column(5,
-         numericInput("w5", "Portf. %", 7.5,
+         numericInput("w5", h4("Portf. %"), 7.5,
                       min = 1, max = 100))
 )
 
 # Portfolio Rebalance Interval
 fluidRow(
   column(6,
-         selectInput("rebalance", "Rebalance Freq",
+         selectInput("rebalance", h4("Rebalance Freq"),
                      c("Yearly" = "years",
                        "Monthly" = "months",
-                       "Weekly" = "weeks"))), 
+                       "Weekly" = "weeks")))
+)
+
+
+# Benchmark Portfolio Input
+fluidRow(
+  column(6,
+         textInput("bench_stock", h4("Benchmark"), "^GSPC")), 
   column(5, 
          numericInput("window",
-                   "Window",
+                   h4("Window"),
                    12,
                    min = 3,
                    max = 35,
@@ -122,18 +130,11 @@ fluidRow(
                    ))
 )
 
-
-# Benchmark Portfolio Input
-fluidRow(
-  column(10,
-         textInput("bench_stock", "Benchmark Stock", "^GSPC"))
-)
-
 # User input Start Date and rolling window
 fluidRow(
   column(7,
          dateInput("start_date",
-                   "Starting Date",
+                   h4("Starting Date"),
                    "2006-02-01",
                    format = "yyyy-mm-dd")))
 
@@ -142,7 +143,7 @@ fluidRow(
 fluidRow(
   column(7,
          dateInput("end_date",
-                   "End Date",
+                   h4("End Date"),
                    today(),
                    format = "yyyy-mm-dd"))
 )
@@ -151,7 +152,7 @@ fluidRow(
 fluidRow(
   column(6,
          numericInput("rfr",
-                   "Risk Free Rate %",
+                   h4("Risk Free Rate %"),
                    0.0003,
                    min = 0,
                    max= 1)
@@ -847,6 +848,69 @@ ignoreNULL = FALSE)
 # Render and output to the UI
 output$second_port <- renderTable(second_portfolio())
 tableOutput("second_port")
+
+```
+
+
+### Image of first ticker
+
+```{r}
+# Renders an image 
+ticker_tbl <- eventReactive(input$submit, {
+  
+  symbols <- c(input$stock1, 
+               input$stock2,
+               input$stock3,
+               input$stock4,
+               input$stock5)
+  
+  end <- input$end_date
+  start <- input$start_date
+  
+  w <- c(input$w1/100,
+         input$w2/100,
+         input$w3/100,
+         input$w4/100,
+         input$w5/100)
+  
+  wts_tbl <- tibble(symbols, w)
+  
+  wts_tbl 
+
+  
+}, # Renders on load
+ignoreNULL = FALSE)
+
+
+renderImage({
+  
+  detect <- ticker_tbl() %>% 
+    slice(1) %>% 
+    pull(symbols)
+  
+  detect <- detect %>% 
+    str_to_lower() %>% 
+    str_replace_all("-", "_") %>% 
+    str_replace_all(" ", "_") 
+    
+  directory_files <- fs::dir_ls(path = "ticker_img")
+  
+  detection_results <- directory_files %>% 
+    str_detect(pattern = str_glue("ticker_img/{detect}"))
+  
+  path <- directory_files[detection_results]
+  
+  list(
+    src = path,
+    contentType = "image/png",
+    width = "100%",
+    alt = detect
+  )
+   
+}, deleteFile = FALSE)
+  
+ 
+
 
 ```
 
