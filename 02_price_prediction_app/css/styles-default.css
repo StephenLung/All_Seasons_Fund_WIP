@@ -58,16 +58,25 @@ body {
 /* BUTTONS ---- set background colour as black, font as white, border orange*/
 .btn-default {
     color: #ffffff;
-    background-color: #2c3e50;
+    background-color: #000000;
     border-color: #ff7518
 }
 
-/* SELECT BUTTONS ---- set background colour as orange*/
-.selectize-input.full {
+/* set background of button when hovered over as orange*/
+.btn-default:hover {
+    color: #ffffff;
     background-color: #ff7518;
+    border-color: #040404
 }
 
-/* drop down select as light orange */
+
+
+/* SELECT BUTTONS ---- set background colour as white*/
+.selectize-input.full {
+    background-color: #ffffff;
+}
+
+/* drop down select as white */
 .selectize-dropdown, .selectize-dropdown.form-control {
-    background: #ff751875;
+    background: #FFFFFF;
 }
