@@ -1,0 +1,98 @@
+/* FONT */
+/* from google font */
+@import url('https://fonts.googleapis.com/css?family=Montserrat:600|Roboto:300&display=swap');
+
+/* from cannondale website */
+@font-face {
+    font-family: "Klavika";
+    src: url('https://www.cannondale.com/~/media/Fonts/Cannondale/Klavika/KlavikaWebBasicMedium.woff') format('woff')
+}
+
+@font-face {
+    font-family: 'KlavikaWebMediumCond';
+    src: url('https://www.cannondale.com/~/media/Fonts/Cannondale/Klavika/Condensed/KlavikaWebMediumCond.woff') format('woff')
+}
+
+
+/* set inputs with h4 as orange color font */
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
+    font-family: 'KlavikaWebMediumCond', sans-serif;
+    color: #ff7518;
+    font-size: 14px;
+}
+
+/* set all other text as blue tq theme font */
+body {
+    font-family: 'Klavika', sans-serif;
+    color: #2c3e50; 
+    text-transform: uppercase;
+    font-size: 14px;
+}
+
+.input-group-addon{
+    text-transform: lowercase !important;
+}
+
+
+/* NAVBAR ---- set background colour as white, border as black*/
+.navbar-inverse {
+    background-color: #FFFFFF;
+    border-color: #000000;
+}
+
+/* set title as black */
+.navbar-inverse .navbar-brand {
+    color: #000000;
+}
+
+
+/* adjust navbar sizing */
+.navbar-logo img {
+    width: 50px;
+    margin-bottom: 1px;
+    margin-top: 0px;
+    margin-right: 12px;
+}
+
+
+/* SIDEBAR ---- set background colour as black*/
+.section.sidebar {
+    background-color: #000000;
+}
+
+/* enables container to extend from 250px to 350px */
+#dashboard-container {
+    padding-left: 350px !important;
+}
+
+/* extends the sidebar width */
+.sidebar {
+    width: 350px !important;
+}
+
+
+/* BUTTONS ---- set background colour as black, font as white, border orange*/
+.btn-default {
+    color: #ffffff;
+    background-color: #000000;
+    border-color: #ff7518
+}
+
+/* set background of button when hovered over as orange*/
+.btn-default:hover {
+    color: #ffffff;
+    background-color: #ff7518;
+    border-color: #040404
+}
+
+
+
+/* SELECT BUTTONS ---- set background colour as white*/
+.selectize-input.full {
+    background-color: #ffffff;
+}
+
+/* drop down select as white */
+.selectize-dropdown, .selectize-dropdown.form-control {
+    background: #FFFFFF;
+}
