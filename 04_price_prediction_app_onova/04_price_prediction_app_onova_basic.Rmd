@@ -47,6 +47,7 @@ pacman::p_load(
 # Scripts
 # source("../01_Scripts_Flex/wealth_index.R")
 source("01_Scripts_Flex/wealth_index.R")
+source("00_Scripts/05_basic.R")
 
 ```
 
@@ -104,13 +105,20 @@ fluidRow(
                       min = 1, max = 100))
 )
 
-# Portfolio Rebalance Interval
+# Portfolio Rebalance Interval and user risk free rate
 fluidRow(
   column(6,
          selectInput("rebalance", h4("Rebalance Freq"),
                      c("Yearly" = "years",
                        "Monthly" = "months",
-                       "Weekly" = "weeks")))
+                       "Weekly" = "weeks"))),
+  column(5,
+       numericInput("rfr",
+                 h4("Risk Free Rate"),
+                 0.0003,
+                 min = 0,
+                 max= 1)
+)
 )
 
 
@@ -128,33 +136,41 @@ fluidRow(
                    ))
 )
 
-# User input Start Date 
+# ERROR:User Range input start and end date --- cannot get the box height and to match the other boxes
+# fluidRow(
+#   column(12, 
+#          dateRangeInput(inputId = "date_range",
+#                         label = h4("Date Range"),
+#                         start = "2006-02-01",
+#                         end = today(),
+#                         min = "2000-01-01",
+#                         max = today(),
+#                         format = "yyyy-mm-dd"))
+# )
+
+# User input Start Date and End Date
 fluidRow(
-  column(7,
+  column(5,
          dateInput("start_date",
                    h4("Starting Date"),
                    "2006-02-01",
-                   format = "yyyy-mm-dd")))
+                   format = "yyyy-mm-dd")),
+  column(5,
+       dateInput("end_date",
+                 h4("End Date"),
+                 today(),
+                 format = "yyyy-mm-dd"))
+  )
 
 
 # User Input End Date
-fluidRow(
-  column(7,
-         dateInput("end_date",
-                   h4("End Date"),
-                   today(),
-                   format = "yyyy-mm-dd"))
-)
-
-# User Input risk free rate
-fluidRow(
-  column(6,
-         numericInput("rfr",
-                   h4("Risk Free Rate %"),
-                   0.0003,
-                   min = 0,
-                   max= 1)
-))
+# fluidRow(
+#   column(7,
+#          dateInput("end_date",
+#                    h4("End Date"),
+#                    today(),
+#                    format = "yyyy-mm-dd"))
+# )
 
 
 
@@ -175,7 +191,7 @@ switchInput(inputId = "forecast_mode",
 
 conditionalPanel(condition = "input.forecast_mode == 1",
                  numericInput(inputId = "n_future",
-                              label = "Forecast Horizon",
+                              label = h4("Forecast Horizon"),
                               value = 12,
                               min = 1))
 
@@ -821,13 +837,82 @@ renderHighchart({
 renderTable(rolling_sharpe_ratio())
 ```
 
-
 ### Returns over Time (GGplot + Plotly)
+
+
 ```{r}
 
+shinyWidgets::radioGroupButtons(
+  inputId  = "time_unit", 
+  label    = "Time Unit", 
+  choices  = c("D" = "daily", "W" = "weekly", "M" = "monthly", "Q" = "quarterly", "Y" = "yearly"), 
+  selected = "daily", 
+  status   = "primary", 
+  justified = TRUE, 
+  checkIcon = list(
+    yes = icon("ok", lib = "glyphicon"), 
+    no  = NULL
+    )
+)
 
+observeEvent(eventExpr = input$time_unit, {
+    
+    if(input$forecast_mode){
+        
+        delay(300, click(id = "apply"))
+        
+    }
+    
+})
 
+observeEvent(eventExpr = input$forecast_mode, {
+    
+    
+        
+        delay(300, click(id = "apply"))
+        
+    
+    
+}, once = TRUE)
 
+```
+
+```{r}
+time_plot_basic_tbl <- reactive({
+  
+    symbols <- c(input$stock1, 
+               input$stock2,
+               input$stock3,
+               input$stock4,
+               input$stock5)
+  
+  end <- input$end_date
+  start <- input$start_date
+  
+  w <- c(input$w1/100,
+         input$w2/100,
+         input$w3/100,
+         input$w4/100,
+         input$w5/100)
+  
+  wts_tbl <- tibble(symbols, w)
+  
+
+  multi_asset_price_portfolio(symbols = symbols, end, start, wts_tbl) %>%
+  aggregate_returns_portfolio(period = input$time_unit) # problems with daily unit
+  
+})
+
+output$plotly_basic <- renderPlotly({
+
+  p <- time_plot_basic_tbl() %>%
+  plot_time_series(facetgrid = TRUE, ggplotly = TRUE, period = input$time_unit)
+
+  p
+
+})
+
+plotlyOutput(outputId = "plotly_basic")
 
 ```
 
@@ -891,6 +976,12 @@ ignoreNULL = FALSE)
 output$second_port <- renderTable(second_portfolio())
 tableOutput("second_port")
 
+```
+
+### Returns of each asset
+
+```{r}
+renderPrint(time_plot_basic_tbl())
 ```
 
 

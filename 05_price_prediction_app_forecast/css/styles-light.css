@@ -14,10 +14,10 @@
 }
 
 
-/* set inputs with h4 as orange color font */
+/* set inputs with h4 as BSU blue color font */
 h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
     font-family: 'KlavikaWebMediumCond', sans-serif;
-    color: #ff7518;
+    color: #2c3e50;
     font-size: 14px;
 }
 
@@ -27,17 +27,23 @@ body {
     color: #2c3e50; 
     text-transform: uppercase;
     font-size: 14px;
+    background-color: #dddddd;
 }
 
-/* NAVBAR ---- set background colour as white, border as black*/
+.input-group-addon{
+    text-transform: lowercase !important;
+}
+
+
+/* NAVBAR ---- set background colour as BSU blue, border as white*/
 .navbar-inverse {
-    background-color: #FFFFFF;
-    border-color: #000000;
+    background-color: #2c3e50;
+    border-color: #fff;
 }
 
-/* set title as black */
+/* set title as white */
 .navbar-inverse .navbar-brand {
-    color: #000000;
+    color: #ffffff;
 }
 
 
@@ -50,11 +56,13 @@ body {
 }
 
 
-/* SIDEBAR ---- set background colour as black*/
+/* SIDEBAR ---- set background colour as grey */
 .section.sidebar {
-    background-color: #000000;
+    background-color: #dddddd;
 }
 
+/* if screen is large then add more padding to the nav bar */
+@media screen and (min-width: 767px){
 /* enables container to extend from 250px to 350px */
 #dashboard-container {
     padding-left: 350px !important;
@@ -64,23 +72,51 @@ body {
 .sidebar {
     width: 350px !important;
 }
+}
 
+/* if screen is mobile then add scroll option on the navbar */
+@media screen and (max-width: 767px){
+    .chart-shim{
+        overflow-y: scroll;
+    }
+}
+
+/* SWITCH */
+
+.bootstrap-switch {
+    border-color: #2c3e50;
+}
+
+/* adjust border colour of button to be orange */
+.bootstrap-switch.bootstrap-switch-focused {
+    border-color: #2c3e50;
+}
+
+/* adjusts colour of text to blue */
+.bootstrap-switch .bootstrap-switch-handle-off.bootstrap-switch-success, .bootstrap-switch .bootstrap-switch-handle-on.bootstrap-switch-success {
+    color: rgb(255, 255, 255);
+    background: #2c3e50;
+}
+
+/* primary will return black button for dark mode */
+.bootstrap-switch .bootstrap-switch-handle-off.bootstrap-switch-primary, .bootstrap-switch .bootstrap-switch-handle-on.bootstrap-switch-primary {
+    color: #fff;
+    background: #000000;
+}
 
 /* BUTTONS ---- set background colour as black, font as white, border orange*/
 .btn-default {
     color: #ffffff;
     background-color: #000000;
-    border-color: #ff7518
+    border-color: #2c3e50
 }
 
 /* set background of button when hovered over as orange*/
 .btn-default:hover {
     color: #ffffff;
-    background-color: #ff7518;
+    background-color: #2c3e50;
     border-color: #040404
 }
-
-
 
 /* SELECT BUTTONS ---- set background colour as white*/
 .selectize-input.full {

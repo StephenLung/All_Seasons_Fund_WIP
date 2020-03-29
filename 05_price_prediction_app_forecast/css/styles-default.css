@@ -21,13 +21,19 @@ h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
     font-size: 14px;
 }
 
-/* set all other text as blue tq theme font */
+/* set all other text as white font and background as black */
 body {
     font-family: 'Klavika', sans-serif;
-    color: #2c3e50; 
+    color: #FFFFFF; 
     text-transform: uppercase;
     font-size: 14px;
+    background-color: #000000;
 }
+
+.input-group-addon{
+    text-transform: lowercase !important;
+}
+
 
 /* NAVBAR ---- set background colour as white, border as black*/
 .navbar-inverse {
@@ -55,6 +61,8 @@ body {
     background-color: #000000;
 }
 
+/* if screen is large then add more padding to the nav bar */
+@media screen and (min-width: 767px){
 /* enables container to extend from 250px to 350px */
 #dashboard-container {
     padding-left: 350px !important;
@@ -64,7 +72,38 @@ body {
 .sidebar {
     width: 350px !important;
 }
+}
 
+/* if screen is mobile then add scroll option on the navbar */
+@media screen and (max-width: 767px){
+    .chart-shim{
+        overflow-y: scroll;
+    }
+    
+    .level3:first-child{
+        background-color: #000000;
+    }
+}
+
+
+
+/* SWITCH */
+/* adjust border colour of button to be orange */
+.bootstrap-switch.bootstrap-switch-focused {
+    border-color: #ff7518;
+}
+    
+/* adjusts background of text to blue */
+.bootstrap-switch .bootstrap-switch-handle-off.bootstrap-switch-success, .bootstrap-switch .bootstrap-switch-handle-on.bootstrap-switch-success {
+    color: rgb(255, 255, 255);
+    background: #2c3e50;
+}
+
+/* primary will return black button for dark mode */
+.bootstrap-switch .bootstrap-switch-handle-off.bootstrap-switch-primary, .bootstrap-switch .bootstrap-switch-handle-on.bootstrap-switch-primary {
+    color: #fff;
+    background: #000000;
+}
 
 /* BUTTONS ---- set background colour as black, font as white, border orange*/
 .btn-default {
@@ -79,7 +118,6 @@ body {
     background-color: #ff7518;
     border-color: #040404
 }
-
 
 
 /* SELECT BUTTONS ---- set background colour as white*/

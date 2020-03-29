@@ -1,0 +1,12 @@
+name: price_prediction_forecast_app
+title: price_prediction_forecast_app
+username:
+account: stephenlung
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2014123
+bundleId: 2939855
+url: https://stephenlung.shinyapps.io/price_prediction_forecast_app/
+when: 1585497704.04457
+asMultiple: FALSE
+asStatic: FALSE

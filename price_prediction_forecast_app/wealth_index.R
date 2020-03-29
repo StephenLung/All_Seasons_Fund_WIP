@@ -1,7 +1,4 @@
 
-p_load(dplyr,
-       rlang)
-
 symbols <- c("VTI", "TLT", "IEF", "GLD", "DBC")
 tech_symbols <- c("MSFT", "AMZN", "AAPL", "NFLX", "GOOG") 
 # remove fb out as they IPO after financial crisis in 2012
@@ -99,6 +96,7 @@ multi_asset_return_portfolio <- function(stock_price_tbl, period = "monthly"){
 # Creates a wealth_index given the weights ----
 wealth_index <- function(return_data, wts_tbl, name_portfolio){
   
+  library(rlang)
   name_portfolio <- as_name(name_portfolio)
   
   # Determine # of tickers
